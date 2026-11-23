@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>USJ ショースケジュール＆鑑賞プランナー</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Noto Sans JP"', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+
+    /* カスタムスクロールバー */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* 時間重複時のパルスアニメーション */
+    @keyframes conflictPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.85), 0 4px 12px rgba(239, 68, 68, 0.25);
+      }
+      50% {
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35), 0 4px 16px rgba(239, 68, 68, 0.4);
+      }
+    }
+    .conflict-card {
+      animation: conflictPulse 2s infinite;
+    }
+
+    /* トーストアニメーション */
+    @keyframes slideUpFade {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 16px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
+    .toast-enter {
+      animation: slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-100 text-slate-900">
+
+  <!-- 超スリムトップヘッダー -->
+  <header class="bg-gradient-to-r from-indigo-950 via-blue-900 to-sky-900 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-[1480px] mx-auto px-2.5 sm:px-6 py-1.5">
+      <div class="flex items-center justify-between gap-1.5">
+        <!-- アプリタイトル -->
+        <div class="flex items-center gap-1.5 min-w-0">
+          <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-xs shrink-0 text-slate-950 font-extrabold text-xs sm:text-base">
+            🌐
+          </div>
+          <h1 class="text-xs sm:text-base font-extrabold tracking-tight truncate">
+            <span class="sm:hidden">USJ ショー計画</span>
+            <span class="hidden sm:inline">USJ ショースケジュール＆鑑賞プランナー</span>
+          </h1>
+        </div>
+
+        <!-- 日付選択＆コンパクトアクション群 -->
+        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <div class="flex items-center bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 gap-1">
+            <input id="schedule-date" type="date" value="2026-11-23"
+              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[96px] sm:w-auto" />
+            <button id="btn-fetch-schedule" type="button"
+              class="px-1.5 py-0.5 rounded bg-sky-400 hover:bg-sky-300 active:scale-95 text-slate-950 text-[10px] sm:text-xs font-extrabold transition flex items-center gap-0.5 cursor-pointer">
+              <span id="fetch-icon">🔄</span>
+              <span>更新</span>
+            </button>
+          </div>
+
+          <button id="btn-add-show" type="button" title="演目追加"
+            class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold border border-white/15 transition cursor-pointer">
+            ＋
+          </button>
+
+          <button id="btn-copy-plan" type="button"
+            class="px-2 sm:px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-[11px] sm:text-xs font-extrabold shadow-xs transition flex items-center gap-1 cursor-pointer">
+            <span>📋</span>
+            <span>コピー</span>
+          </button>
+
+          <button id="btn-sync-modal" type="button" title="家族・身内とリアルタイム同期"
+            class="px-2 sm:px-2.5 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/35 active:scale-95 text-emerald-100 text-[11px] sm:text-xs font-extrabold border border-emerald-400/50 transition flex items-center gap-1 cursor-pointer">
+            <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+            <span id="sync-btn-label">同期</span>
+          </button>
+
+          <button id="btn-reset-default" type="button" title="初期データに戻す"
+            class="px-1.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-sky-200 hover:text-white text-[11px] border border-white/15 transition cursor-pointer">
+            ↺
+          </button>
+        </div>
+      </div>
+
+      <!-- 1行サマリー＆重複警告バー -->
+      <div class="mt-1 pt-1 border-t border-white/15 flex items-center justify-between gap-1 text-[10px] sm:text-xs overflow-x-auto">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button id="badge-room-id" type="button" title="タップして合言葉を確認・変更"
+            class="inline-flex items-center gap-1 bg-indigo-500/30 hover:bg-indigo-500/45 border border-indigo-300/40 px-1.5 py-0.5 rounded text-indigo-100 font-bold cursor-pointer">
+            <span>🔑</span>
+            <span id="header-room-code">USJ-1123</span>
+          </button>
+          <span class="bg-white/10 px-1.5 py-0.5 rounded text-sky-100">
+            <strong id="summary-show-count" class="text-white">0演目</strong>/<strong id="summary-slot-count" class="text-amber-300">0公演</strong>
+          </span>
+          <span id="summary-time-range" class="hidden bg-white/10 px-1.5 py-0.5 rounded text-sky-100 font-semibold">
+            🕒 <span id="summary-time-text">--:-- ～ --:--</span>
+          </span>
+          <span id="schedule-source-text" class="hidden md:inline text-sky-200/80 text-[11px]">
+            2026/11/23 公演スケジュール反映済
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span id="no-overlap-badge" class="bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 px-1.5 py-0.5 rounded font-bold">
+            ✓ 重複なし
+          </span>
+          <div id="overlap-banner" class="hidden items-center gap-1 bg-red-500/90 text-white px-2 py-0.5 rounded font-extrabold">
+            <button id="overlap-banner-jump" type="button" class="underline cursor-pointer">
+              ⚠️ <span id="overlap-banner-text">時間重複あり</span>
+            </button>
+            <button id="btn-auto-resolve" type="button"
+              class="ml-1 px-1.5 py-0.2 rounded bg-white text-red-700 text-[10px] font-extrabold hover:bg-red-50 cursor-pointer">
+              ✨自動調整
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- モバイル専用：リスト／カレンダー切替タブバー -->
+  <div class="lg:hidden bg-white border-b border-slate-200 px-2.5 py-1.5 sticky top-[62px] z-30">
+    <div class="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
+      <button id="tab-list" type="button"
+        class="py-1 px-2 rounded-md text-[11px] font-bold transition text-slate-600 hover:text-slate-900 cursor-pointer">
+        📋 演目リスト（見る／見ない）
+      </button>
+      <button id="tab-calendar" type="button"
+        class="py-1 px-2 rounded-md text-[11px] font-bold transition bg-white text-blue-900 shadow-xs cursor-pointer">
+        📅 時間軸カレンダー
+      </button>
+    </div>
+  </div>
+
+  <!-- メイン2ペインワークスペース -->
+  <main class="flex-1 max-w-[1480px] w-full mx-auto px-2 sm:px-6 py-2 sm:py-4 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-start">
+
+    <!-- 左ペイン：演目リスト（左：見るON ／ 右：見ないOFF） -->
+    <section id="panel-list" class="hidden lg:flex lg:col-span-5 flex-col gap-2.5 bg-white rounded-2xl p-2.5 sm:p-3.5 shadow-xs border border-slate-200/80">
+      <!-- カテゴリ絞り込み＆一括操作 -->
+      <div class="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
+        <div id="category-filters" class="flex flex-wrap items-center gap-1">
+          <button type="button" data-cat="all"
+            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-900 text-white shadow-xs transition cursor-pointer">
+            すべて
+          </button>
+          <button type="button" data-cat="show"
+            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            🎪 ショー
+          </button>
+          <button type="button" data-cat="parade"
+            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            🎉 パレード
+          </button>
+          <button type="button" data-cat="greeting"
+            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            🤝 グリーティング
+          </button>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <button id="btn-all-on" type="button"
+            class="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold transition cursor-pointer">
+            全ON
+          </button>
+          <button id="btn-all-off" type="button"
+            class="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 text-[11px] font-bold transition cursor-pointer">
+            全OFF
+          </button>
+        </div>
+      </div>
+
+      <!-- 2列分割リスト（左：見るON ／ 右：見ないOFF） -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <!-- 左列：見る（ON） -->
+        <div class="bg-emerald-50/70 rounded-xl p-2 border border-emerald-200/80 flex flex-col gap-2">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-extrabold text-emerald-950">✅ 見る（ON）</span>
+            <span id="on-column-count" class="text-[11px] font-extrabold text-emerald-800 bg-emerald-200/70 px-2 py-0.5 rounded-full">0件</span>
+          </div>
+          <div id="show-list-on" class="flex flex-col gap-2 max-h-[68dvh] overflow-y-auto custom-scrollbar pr-0.5"></div>
+        </div>
+
+        <!-- 右列：見ない（OFF） -->
+        <div class="bg-slate-100/80 rounded-xl p-2 border border-slate-200 flex flex-col gap-2">
+          <div class="flex items-center justify-between px-1">
+            <span class="text-xs font-extrabold text-slate-700">🙈 見ない（OFF）</span>
+            <span id="off-column-count" class="text-[11px] font-extrabold text-slate-600 bg-slate-200 px-2 py-0.5 rounded-full">0件</span>
+          </div>
+          <div id="show-list-off" class="flex flex-col gap-2 max-h-[68dvh] overflow-y-auto custom-scrollbar pr-0.5"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右ペイン：時間軸スケジュールカレンダー -->
+    <section id="panel-calendar" class="flex lg:col-span-7 flex-col bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden isolate">
+      <!-- カレンダー上部コントロールバー -->
+      <div class="px-2.5 sm:px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-1.5">
+        <div class="flex items-center gap-1.5">
+          <button id="btn-toggle-lanes" type="button"
+            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[11px] font-extrabold shadow-2xs transition cursor-pointer">
+            ✅｜🙈 2列比較中
+          </button>
+          <button id="btn-zoom-scale" type="button"
+            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[11px] font-extrabold shadow-2xs transition cursor-pointer">
+            ↕ 縦幅: 広め
+          </button>
+        </div>
+
+        <div class="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[11px] font-bold">
+          <button id="view-mode-all" type="button"
+            class="px-2 py-0.5 rounded-md bg-white text-blue-900 shadow-xs transition cursor-pointer">
+            候補も表示
+          </button>
+          <button id="view-mode-selected" type="button"
+            class="px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition cursor-pointer">
+            決定回のみ
+          </button>
+        </div>
+      </div>
+
+      <!-- スクロール可能なタイムテーブル本体 -->
+      <div id="calendar-scroll-area" class="w-full h-[76dvh] lg:h-[78dvh] overflow-auto custom-scrollbar relative bg-white">
+        <div id="calendar-canvas-wrapper" class="relative"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 演目追加・公演時間編集モーダル -->
+  <div id="modal-overlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 bg-gradient-to-r from-indigo-950 to-blue-900 text-white flex items-center justify-between">
+        <h3 id="modal-title" class="text-sm sm:text-base font-extrabold">演目・公演時間の編集</h3>
+        <button id="modal-close" type="button" class="text-sky-200 hover:text-white text-lg font-bold px-2 cursor-pointer">✕</button>
+      </div>
+
+      <form id="show-form" class="p-4 sm:p-5 flex flex-col gap-3.5 max-h-[82dvh] overflow-y-auto">
+        <input id="edit-show-id" type="hidden" />
+
+        <div>
+          <label for="input-title" class="block text-xs font-extrabold text-slate-700 mb-1">演目名 *</label>
+          <input id="input-title" type="text" required placeholder="例：パワー・オブ・ロック"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label for="input-category" class="block text-xs font-extrabold text-slate-700 mb-1">種別</label>
+            <select id="input-category"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600">
+              <option value="show">🎪 ショー</option>
+              <option value="parade">🎉 パレード</option>
+              <option value="greeting">🤝 グリーティング</option>
+            </select>
+          </div>
+          <div>
+            <label for="input-duration" class="block text-xs font-extrabold text-slate-700 mb-1">所要時間（分）</label>
+            <input id="input-duration" type="number" min="5" max="180" value="25"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label for="input-area" class="block text-xs font-extrabold text-slate-700 mb-1">開催エリア</label>
+            <input id="input-area" type="text" placeholder="例：ニューヨーク・エリア"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600" />
+          </div>
+          <div>
+            <label for="input-color" class="block text-xs font-extrabold text-slate-700 mb-1">ラベル色</label>
+            <select id="input-color"
+              class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600">
+              <option value="blue">ブルー</option>
+              <option value="rose">ローズ</option>
+              <option value="amber">アンバー</option>
+              <option value="emerald">エメラルド</option>
+              <option value="purple">パープル</option>
+              <option value="cyan">シアン</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 公演開始時刻の追加・削除 -->
+        <div class="bg-slate-50 rounded-xl p-3 border border-slate-200">
+          <label class="block text-xs font-extrabold text-slate-700 mb-1.5">公演開始時刻</label>
+          <div class="flex items-center gap-2 mb-2.5">
+            <input id="input-new-time" type="time" value="14:00"
+              class="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-600" />
+            <button id="btn-add-time-chip" type="button"
+              class="px-3 py-1.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-extrabold cursor-pointer">
+              ＋ 時刻追加
+            </button>
+          </div>
+          <div id="modal-time-chips" class="flex flex-wrap gap-1.5 min-h-[28px] items-center"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <button id="btn-delete-show" type="button"
+            class="hidden px-3 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 text-xs font-extrabold border border-red-200 cursor-pointer">
+            🗑️ 削除
+          </button>
+          <div class="flex items-center gap-2 ml-auto">
+            <button id="modal-cancel" type="button"
+              class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold cursor-pointer">
+              キャンセル
+            </button>
+            <button type="submit"
+              class="px-5 py-2 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-extrabold shadow-xs cursor-pointer">
+              保存する
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- リアルタイム同期・共有モーダル -->
+  <div id="sync-modal-overlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🔄</span>
+          <h3 class="text-sm sm:text-base font-extrabold">家族・身内とリアルタイム同期</h3>
+        </div>
+        <button id="sync-modal-close" type="button" class="text-emerald-100 hover:text-white text-lg font-bold px-2 cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-5 flex flex-col gap-4 max-h-[82dvh] overflow-y-auto">
+        <!-- 接続ステータス -->
+        <div id="sync-connection-box" class="rounded-xl p-3 bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-[11px] font-bold text-emerald-800">現在の同期ステータス</div>
+            <div id="sync-connection-text" class="text-xs sm:text-sm font-extrabold text-emerald-950 mt-0.5">接続準備中...</div>
+          </div>
+          <span id="sync-connection-pill" class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-600 text-white shrink-0">
+            待機中
+          </span>
+        </div>
+
+        <!-- 現在の合言葉（ルームID） -->
+        <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-extrabold text-slate-700">🔑 現在の合言葉（ルームID）</span>
+            <button id="btn-new-random-room" type="button" class="text-[11px] font-bold text-blue-700 hover:underline cursor-pointer">
+              新しい合言葉を発行
+            </button>
+          </div>
+          <div class="flex items-center gap-2 mt-1.5">
+            <div id="modal-current-room" class="flex-1 px-3 py-2 rounded-xl bg-white border border-slate-300 font-mono text-base font-extrabold text-slate-900 tracking-wider text-center select-all">
+              USJ-1123
+            </div>
+            <button id="btn-copy-room-code" type="button"
+              class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold shrink-0 cursor-pointer">
+              合言葉コピー
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-2 leading-relaxed">
+            奥様やご家族のスマホでも同じページを開き、この<strong>「合言葉」</strong>を入力すると、誰かがショーや時間をON/OFFした瞬間に全員の画面へリアルタイム反映されます。
+          </p>
+        </div>
+
+        <!-- 招待リンクコピー -->
+        <button id="btn-copy-invite-link" type="button"
+          class="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 text-xs sm:text-sm font-extrabold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>🔗</span>
+          <span>招待リンク（合言葉＆現在の状態つき）をコピー</span>
+        </button>
+
+        <!-- 別の合言葉に参加 -->
+        <form id="join-room-form" class="border-t border-slate-200 pt-3.5 flex flex-col gap-2">
+          <label for="input-join-room" class="text-xs font-extrabold text-slate-700">別の合言葉（ルーム）に参加・切り替え</label>
+          <div class="flex gap-2">
+            <input id="input-join-room" type="text" placeholder="例：たなか家 / USJ-1123"
+              class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-600" />
+            <button type="submit"
+              class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-extrabold shrink-0 cursor-pointer">
+              参加する
+            </button>
+          </div>
+        </form>
+
+        <!-- 独自ドメイン公開時のメモ -->
+        <details class="bg-slate-100 rounded-xl p-3 text-[11px] text-slate-600">
+          <summary class="font-bold text-slate-800 cursor-pointer">🌐 独自ドメイン（Cloudflare Pages等）に置く場合</summary>
+          <p class="mt-1.5 leading-relaxed">
+            HTMLファイル1枚をそのままアップロードして公開できます。独自ドメイン上でもリアルタイム同期を使う場合は、HTML内の <code class="bg-white px-1 rounded">CUSTOM_FIREBASE_CONFIG</code> に無料のFirebase設定値を貼り付けてください（未設定でも「招待リンクをコピー」でON/OFF状態の共有はそのまま使えます）。
+          </p>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知（alert()の代替） -->
+  <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2"></div>
+
+  <!-- Firebase リアルタイム同期モジュール -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // 独自ドメインで運用する際にリアルタイム同期を有効化したい場合はここにFirebase設定を記入
+    const CUSTOM_FIREBASE_CONFIG = null;
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    let firebaseConfig = null;
+    try {
+      if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+        firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+      } else if (CUSTOM_FIREBASE_CONFIG) {
+        firebaseConfig = CUSTOM_FIREBASE_CONFIG;
+      }
+    } catch (e) {
+      console.warn('Firebase config parse error:', e);
+    }
+
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+    let unsubscribeRoom = null;
+    let pushTimer = null;
+    let isApplyingRemote = false;
+    let lastClientUpdateId = '';
+
+    function sanitizeRoomId(raw) {
+      const cleaned = String(raw || '').trim().replace(/\//g, '_').slice(0, 40);
+      return cleaned || 'USJ-1123';
+    }
+
+    function updateSyncUI(status, message) {
+      const dot = document.getElementById('sync-status-dot');
+      const label = document.getElementById('sync-btn-label');
+      const connText = document.getElementById('sync-connection-text');
+      const connPill = document.getElementById('sync-connection-pill');
+      const headerCode = document.getElementById('header-room-code');
+      const modalCode = document.getElementById('modal-current-room');
+
+      const room = window.USJSyncState ? window.USJSyncState.roomId : 'USJ-1123';
+      if (headerCode) headerCode.textContent = room;
+      if (modalCode) modalCode.textContent = room;
+
+      if (status === 'connected') {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block';
+        if (label) label.textContent = '同期中';
+        if (connText) connText.textContent = message || `合言葉「${room}」でリアルタイム同期中`;
+        if (connPill) {
+          connPill.textContent = '🟢 同期中';
+          connPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-600 text-white shrink-0';
+        }
+      } else if (status === 'offline') {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 inline-block';
+        if (label) label.textContent = 'リンク共有';
+        if (connText) connText.textContent = message || 'URL招待リンク共有モード（Firebase未設定）';
+        if (connPill) {
+          connPill.textContent = '🔗 URL共有';
+          connPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-500 text-slate-950 shrink-0';
+        }
+      } else {
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-sky-400 inline-block';
+        if (label) label.textContent = '同期';
+        if (connText) connText.textContent = message || '接続中...';
+        if (connPill) {
+          connPill.textContent = '接続中';
+          connPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-slate-600 text-white shrink-0';
+        }
+      }
+    }
+
+    async function subscribeToRoom(roomId) {
+      const safeRoom = sanitizeRoomId(roomId);
+      if (window.USJSyncState) {
+        window.USJSyncState.roomId = safeRoom;
+      }
+      updateSyncUI('connecting', `「${safeRoom}」に接続中...`);
+
+      if (!db || !currentUser) {
+        updateSyncUI('offline');
+        return;
+      }
+
+      if (unsubscribeRoom) {
+        unsubscribeRoom();
+        unsubscribeRoom = null;
+      }
+
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'usj_show_rooms', safeRoom);
+      unsubscribeRoom = onSnapshot(
+        docRef,
+        (snapshot) => {
+          updateSyncUI('connected', `合言葉「${safeRoom}」でリアルタイム同期中`);
+          if (!snapshot.exists()) {
+            pushCurrentState(true);
+            return;
+          }
+          const data = snapshot.data();
+          if (!data || !Array.isArray(data.shows)) return;
+          if (data.clientUpdateId && data.clientUpdateId === lastClientUpdateId) return;
+
+          isApplyingRemote = true;
+          try {
+            if (typeof window.applyRemoteScheduleData === 'function') {
+              window.applyRemoteScheduleData(data);
+            }
+          } finally {
+            isApplyingRemote = false;
+          }
+        },
+        (error) => {
+          console.error('Firestore onSnapshot error:', error);
+          updateSyncUI('offline', '同期エラー（URL共有モードで動作中）');
+        }
+      );
+    }
+
+    function pushCurrentState(immediate = false) {
+      if (isApplyingRemote || !db || !currentUser || !window.getExportableScheduleData) return;
+      const safeRoom = sanitizeRoomId(window.USJSyncState ? window.USJSyncState.roomId : 'USJ-1123');
+
+      const executeWrite = async () => {
+        if (!currentUser) return;
+        try {
+          const payload = window.getExportableScheduleData();
+          const updateId = `${currentUser.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+          lastClientUpdateId = updateId;
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'usj_show_rooms', safeRoom);
+          await setDoc(
+            docRef,
+            {
+              targetDate: payload.targetDate,
+              shows: payload.shows,
+              updatedAt: Date.now(),
+              updatedBy: currentUser.uid,
+              clientUpdateId: updateId,
+            },
+            { merge: true }
+          );
+        } catch (err) {
+          console.error('Firestore setDoc error:', err);
+        }
+      };
+
+      if (pushTimer) clearTimeout(pushTimer);
+      if (immediate) {
+        executeWrite();
+      } else {
+        pushTimer = setTimeout(executeWrite, 220);
+      }
+    }
+
+    async function initRealtimeSync() {
+      if (!firebaseConfig) {
+        updateSyncUI('offline');
+        return;
+      }
+
+      try {
+        const app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+        currentUser = auth.currentUser;
+
+        const initialRoom = window.USJSyncState ? window.USJSyncState.roomId : 'USJ-1123';
+        await subscribeToRoom(initialRoom);
+      } catch (e) {
+        console.error('Firebase init/auth failed:', e);
+        updateSyncUI('offline', 'オフライン動作中（招待リンク共有は利用可能）');
+      }
+    }
+
+    window.USJSync = {
+      switchRoom: async (newRoomId) => {
+        await subscribeToRoom(newRoomId);
+      },
+      pushState: () => {
+        pushCurrentState(false);
+      },
+      refreshUI: () => {
+        const room = window.USJSyncState ? window.USJSyncState.roomId : 'USJ-1123';
+        updateSyncUI(db && currentUser ? 'connected' : 'offline', `合言葉「${room}」で同期中`);
+      },
+    };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(initRealtimeSync, 50);
+    });
+  </script>
+
+  <script>
+    /**
+     * USJ ショースケジュール＆鑑賞プランナー（完全版）
+     * - 奥様希望の6演目を初期状態で「見る（ON）」＆時間未選択に設定し、最初の画面をカレンダーに設定
+     * - カレンダー上で複数回ONにした演目は「✅ 2回」のように合計選択回数を表示
+     * - スマホでは左レーン（「✅ 見る演目」）が横幅いっぱいに表示され、右へ横スクロールすると「🙈 見ない演目」を表示
+     */
+
+    const START_HOUR = 9;   // 09:00
+    const END_HOUR = 21;    // 21:00
+    const ZOOM_LEVELS = [
+      { label: '標準', pxPerHour: 132 },
+      { label: '広め', pxPerHour: 216 },
+      { label: '特大', pxPerHour: 300 },
+    ];
+
+    const CATEGORY_META = {
+      show: { icon: '🎪', label: 'ショー' },
+      parade: { icon: '🎉', label: 'パレード' },
+      greeting: { icon: '🤝', label: 'グリーティング' },
+    };
+
+    const COLOR_THEMES = {
+      blue: {
+        bgSelected: 'bg-blue-600 text-white border-blue-700',
+        bgCandidate: 'bg-blue-50/95 text-blue-950 border-blue-400 border-dashed',
+        accentBar: 'bg-blue-600',
+        chipSelected: 'bg-blue-600 text-white border-blue-600 shadow-xs',
+        chipUnselected: 'bg-white text-blue-900 border-blue-200 hover:bg-blue-50',
+      },
+      amber: {
+        bgSelected: 'bg-amber-500 text-slate-950 border-amber-600',
+        bgCandidate: 'bg-amber-50/95 text-amber-950 border-amber-400 border-dashed',
+        accentBar: 'bg-amber-500',
+        chipSelected: 'bg-amber-500 text-slate-950 border-amber-500 shadow-xs',
+        chipUnselected: 'bg-white text-amber-900 border-amber-200 hover:bg-amber-50',
+      },
+      emerald: {
+        bgSelected: 'bg-emerald-600 text-white border-emerald-700',
+        bgCandidate: 'bg-emerald-50/95 text-emerald-950 border-emerald-400 border-dashed',
+        accentBar: 'bg-emerald-600',
+        chipSelected: 'bg-emerald-600 text-white border-emerald-600 shadow-xs',
+        chipUnselected: 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50',
+      },
+      purple: {
+        bgSelected: 'bg-purple-600 text-white border-purple-700',
+        bgCandidate: 'bg-purple-50/95 text-purple-950 border-purple-400 border-dashed',
+        accentBar: 'bg-purple-600',
+        chipSelected: 'bg-purple-600 text-white border-purple-600 shadow-xs',
+        chipUnselected: 'bg-white text-purple-900 border-purple-200 hover:bg-purple-50',
+      },
+      rose: {
+        bgSelected: 'bg-rose-600 text-white border-rose-700',
+        bgCandidate: 'bg-rose-50/95 text-rose-950 border-rose-400 border-dashed',
+        accentBar: 'bg-rose-600',
+        chipSelected: 'bg-rose-600 text-white border-rose-600 shadow-xs',
+        chipUnselected: 'bg-white text-rose-900 border-rose-200 hover:bg-rose-50',
+      },
+      cyan: {
+        bgSelected: 'bg-cyan-600 text-white border-cyan-700',
+        bgCandidate: 'bg-cyan-50/95 text-cyan-950 border-cyan-400 border-dashed',
+        accentBar: 'bg-cyan-600',
+        chipSelected: 'bg-cyan-600 text-white border-cyan-600 shadow-xs',
+        chipUnselected: 'bg-white text-cyan-900 border-cyan-200 hover:bg-cyan-50',
+      },
+    };
+
+    // 時刻文字列("HH:MM") <-> 分変換ユーティリティ
+    function timeToMinutes(timeStr) {
+      if (!timeStr || !timeStr.includes(':')) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+
+    function minutesToTime(totalMinutes) {
+      const clamped = Math.max(0, Math.min(23 * 60 + 59, Math.round(totalMinutes)));
+      const h = Math.floor(clamped / 60);
+      const m = clamped % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // 指定日のUSJショースケジュールを生成（2026年11月〜冬の公演期間・休止日対応）
+    function getScheduleForDate(dateStr) {
+      const target = dateStr || '2026-11-23';
+      const d = new Date(target + 'T00:00:00');
+      const dayOfWeek = isNaN(d.getTime()) ? 1 : d.getDay(); // 0:日, 6:土
+      const isHoliday20261123 = target === '2026-11-23';
+      const isWeekendOrHoliday = dayOfWeek === 0 || dayOfWeek === 6 || isHoliday20261123;
+      const isSaturday = dayOfWeek === 6;
+
+      // ウォーターワールド休止期間（2026/11/28〜12/25）
+      const isWaterWorldSuspended = target >= '2026-11-28' && target <= '2026-12-25';
+      // 11/25以降のクリスマス・冬ナイトショー追加
+      const isWinterSeason = target >= '2026-11-25';
+      const paradeStartTime = isSaturday ? '13:00' : '14:00';
+
+      const list = [
+        {
+          id: 'show-por',
+          title: 'パワー・オブ・ロック ～ホリデー・ロッキン！～',
+          area: 'ニューヨーク・エリア',
+          duration: 25,
+          category: 'show',
+          color: 'rose',
+          enabled: true,
+          times: isWeekendOrHoliday
+            ? [
+                { id: 'por-1', time: '09:25', selected: false },
+                { id: 'por-2', time: '10:55', selected: false },
+                { id: 'por-3', time: '12:35', selected: false },
+                { id: 'por-4', time: '15:05', selected: false },
+                { id: 'por-5', time: '16:45', selected: false },
+                { id: 'por-6', time: '18:25', selected: false },
+              ]
+            : [
+                { id: 'por-1', time: '10:15', selected: false },
+                { id: 'por-2', time: '12:00', selected: false },
+                { id: 'por-3', time: '14:30', selected: false },
+                { id: 'por-4', time: '16:30', selected: false },
+              ],
+        },
+        {
+          id: 'show-kuromi',
+          title: 'クロミ・ライブ ～ Discover Me Discover U!!! ～',
+          area: 'ニューヨーク・エリア',
+          duration: 25,
+          category: 'show',
+          color: 'purple',
+          enabled: true,
+          times: [
+            { id: 'kr-1', time: '09:50', selected: false },
+            { id: 'kr-2', time: '11:25', selected: false },
+            { id: 'kr-3', time: '13:00', selected: false },
+          ],
+        },
+        {
+          id: 'parade-nolimit',
+          title: 'NO LIMIT! パレード ～Discover U!!! バージョン～',
+          area: 'パレードルート全域',
+          duration: 40,
+          category: 'parade',
+          color: 'amber',
+          enabled: true,
+          times: [
+            { id: 'nl-1', time: paradeStartTime, selected: false },
+          ],
+        },
+        {
+          id: 'show-blues',
+          title: 'アルティメット・ブルース・バッシュ ～音楽の色～',
+          area: 'ニューヨーク・エリア',
+          duration: 25,
+          category: 'show',
+          color: 'blue',
+          enabled: true,
+          times: [
+            { id: 'bl-1', time: '15:10', selected: false },
+            { id: 'bl-2', time: '16:45', selected: false },
+            { id: 'bl-3', time: '18:25', selected: false },
+          ],
+        },
+        {
+          id: 'show-unimon',
+          title: 'ユニバーサル・モンスター・ライブ・ロックンロール・ショー',
+          area: 'ハリウッド・エリア',
+          duration: 30,
+          category: 'show',
+          color: 'purple',
+          enabled: true,
+          times: isWeekendOrHoliday
+            ? [
+                { id: 'um-1', time: '11:15', selected: false },
+                { id: 'um-2', time: '13:00', selected: false },
+                { id: 'um-3', time: '14:45', selected: false },
+                { id: 'um-4', time: '16:30', selected: false },
+                { id: 'um-5', time: '18:15', selected: false },
+              ]
+            : [
+                { id: 'um-1', time: '11:30', selected: false },
+                { id: 'um-2', time: '14:00', selected: false },
+                { id: 'um-3', time: '16:30', selected: false },
+              ],
+        },
+        {
+          id: 'show-wicked',
+          title: 'ウィキッド ～オズの魔女たち～',
+          area: 'ランド・オブ・オズ（特別ステージ）',
+          duration: 35,
+          category: 'show',
+          color: 'emerald',
+          enabled: false,
+          times: isWeekendOrHoliday
+            ? [
+                { id: 'wk-1', time: '10:25', selected: false },
+                { id: 'wk-2', time: '11:30', selected: false },
+                { id: 'wk-3', time: '13:05', selected: false },
+                { id: 'wk-4', time: '15:45', selected: false },
+                { id: 'wk-5', time: '17:30', selected: false },
+              ]
+            : [
+                { id: 'wk-1', time: '11:00', selected: false },
+                { id: 'wk-2', time: '13:30', selected: false },
+                { id: 'wk-3', time: '16:00', selected: false },
+              ],
+        },
+        {
+          id: 'show-discover-u',
+          title: 'Discover U!!! タイム',
+          area: 'グラマシーパーク',
+          duration: 20,
+          category: 'show',
+          color: 'amber',
+          enabled: false,
+          times: [
+            { id: 'du-1', time: '12:00', selected: false },
+          ],
+        },
+        {
+          id: 'show-frog',
+          title: 'ホリデー・フロッグ・クワイア',
+          area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+          duration: 20,
+          category: 'show',
+          color: 'emerald',
+          enabled: false,
+          times: [
+            { id: 'fg-1', time: '10:05', selected: false },
+            { id: 'fg-2', time: '11:05', selected: false },
+            { id: 'fg-3', time: '12:05', selected: false },
+            { id: 'fg-4', time: '14:35', selected: false },
+            { id: 'fg-5', time: '16:05', selected: false },
+          ],
+        },
+        {
+          id: 'show-triwizard',
+          title: 'トライウィザード・スピリット・ラリー',
+          area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+          duration: 20,
+          category: 'show',
+          color: 'blue',
+          enabled: false,
+          times: [
+            { id: 'tw-1', time: '11:35', selected: false },
+            { id: 'tw-2', time: '12:35', selected: false },
+            { id: 'tw-3', time: '13:35', selected: false },
+            { id: 'tw-4', time: '15:35', selected: false },
+            { id: 'tw-5', time: '16:35', selected: false },
+          ],
+        },
+        {
+          id: 'greet-minion',
+          title: 'ミニオン・クール・ウインター・グリーティング',
+          area: 'ミニオン・パーク',
+          duration: 20,
+          category: 'greeting',
+          color: 'amber',
+          enabled: false,
+          times: [
+            { id: 'mn-1', time: '09:45', selected: false },
+            { id: 'mn-2', time: '11:05', selected: false },
+            { id: 'mn-3', time: '12:40', selected: false },
+            { id: 'mn-4', time: '15:05', selected: false },
+            { id: 'mn-5', time: '16:25', selected: false },
+          ],
+        },
+        {
+          id: 'greet-hogsmeade',
+          title: 'ホグズミード・マジカル・クリーチャーズ・ミート',
+          area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+          duration: 20,
+          category: 'greeting',
+          color: 'emerald',
+          enabled: false,
+          times: [
+            { id: 'hm-1', time: '09:45', selected: false },
+            { id: 'hm-2', time: '10:45', selected: false },
+            { id: 'hm-3', time: '11:30', selected: false },
+            { id: 'hm-4', time: '12:30', selected: false },
+            { id: 'hm-5', time: '13:15', selected: false },
+            { id: 'hm-6', time: '14:15', selected: false },
+            { id: 'hm-7', time: '15:00', selected: false },
+            { id: 'hm-8', time: '16:00', selected: false },
+          ],
+        },
+        {
+          id: 'greet-hippogriff',
+          title: 'ヒッポグリフ・マジカル・レッスン',
+          area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+          duration: 20,
+          category: 'greeting',
+          color: 'cyan',
+          enabled: false,
+          times: [
+            { id: 'hg-1', time: '09:35', selected: false },
+            { id: 'hg-2', time: '10:35', selected: false },
+            { id: 'hg-3', time: '13:05', selected: false },
+            { id: 'hg-4', time: '14:05', selected: false },
+            { id: 'hg-5', time: '15:05', selected: false },
+          ],
+        },
+        {
+          id: 'greet-wonderland',
+          title: 'ユニバーサル・ワンダーランド ～レッツ・スマイル・トゥギャザー！～',
+          area: 'ユニバーサル・ワンダーランド',
+          duration: 20,
+          category: 'greeting',
+          color: 'rose',
+          enabled: false,
+          times: [
+            { id: 'wl-1', time: '09:45', selected: false },
+            { id: 'wl-2', time: '11:05', selected: false },
+            { id: 'wl-3', time: '12:25', selected: false },
+            { id: 'wl-4', time: '14:55', selected: false },
+            { id: 'wl-5', time: '16:15', selected: false },
+          ],
+        },
+        {
+          id: 'greet-dinosaur',
+          title: 'ジュラシック・パーク・ダイナソー・ミート ＆ グリート',
+          area: 'ジュラシック・パーク',
+          duration: 20,
+          category: 'greeting',
+          color: 'emerald',
+          enabled: false,
+          times: [
+            { id: 'dn-1', time: '10:00', selected: false },
+            { id: 'dn-2', time: '10:55', selected: false },
+            { id: 'dn-3', time: '11:50', selected: false },
+            { id: 'dn-4', time: '12:45', selected: false },
+            { id: 'dn-5', time: '14:15', selected: false },
+            { id: 'dn-6', time: '15:10', selected: false },
+            { id: 'dn-7', time: '16:05', selected: false },
+            { id: 'dn-8', time: '17:00', selected: false },
+          ],
+        },
+        {
+          id: 'greet-studiostars',
+          title: 'スタジオ・スターズ・レストラン・キャラクター・ミート＆グリート',
+          area: 'ハリウッド・エリア',
+          duration: 25,
+          category: 'greeting',
+          color: 'blue',
+          enabled: false,
+          times: [
+            { id: 'ss-1', time: '17:30', selected: false },
+            { id: 'ss-2', time: '19:00', selected: false },
+          ],
+        },
+        {
+          id: 'show-sing',
+          title: 'シング・オン・ツアー（随時運営・時刻非公表）',
+          area: 'イルミネーション・シアター',
+          duration: 25,
+          category: 'show',
+          color: 'cyan',
+          enabled: false,
+          times: [],
+        },
+        {
+          id: 'show-george',
+          title: 'プレイング・ウィズ・おさるのジョージ（随時運営・時刻非公表）',
+          area: 'ハリウッド・エリア',
+          duration: 20,
+          category: 'show',
+          color: 'amber',
+          enabled: false,
+          times: [],
+        },
+      ];
+
+      // ウォーターワールド（休止期間以外は追加）
+      if (!isWaterWorldSuspended) {
+        list.splice(3, 0, {
+          id: 'show-waterworld',
+          title: 'ウォーターワールド',
+          area: 'ウォーターワールド',
+          duration: 20,
+          category: 'show',
+          color: 'cyan',
+          enabled: true,
+          times: isWeekendOrHoliday
+            ? [
+                { id: 'ww-1', time: '12:15', selected: false },
+                { id: 'ww-2', time: '14:30', selected: false },
+                { id: 'ww-3', time: '16:45', selected: false },
+              ]
+            : [
+                { id: 'ww-1', time: '12:30', selected: false },
+                { id: 'ww-2', time: '15:15', selected: false },
+              ],
+        });
+      }
+
+      // 11/25以降の冬ナイトショー2本
+      if (isWinterSeason) {
+        list.push(
+          {
+            id: 'show-winter-light',
+            title: 'ライト・アップ・ザ・ナイト ～クリスマス・セレブレーション～',
+            area: 'グラマシーパーク',
+            duration: 25,
+            category: 'show',
+            color: 'rose',
+            enabled: false,
+            times: [
+              { id: 'xn-1', time: '17:45', selected: false },
+              { id: 'xn-2', time: '19:15', selected: false },
+            ],
+          },
+          {
+            id: 'show-hogwarts-winter',
+            title: 'ホグワーツ・マジカル・ナイト ～ウインター・マジック～',
+            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+            duration: 15,
+            category: 'show',
+            color: 'purple',
+            enabled: false,
+            times: [
+              { id: 'hw-1', time: '18:00', selected: false },
+              { id: 'hw-2', time: '18:45', selected: false },
+              { id: 'hw-3', time: '19:30', selected: false },
+            ],
+          }
+        );
+      }
+
+      return list;
+    }
+
+    // アプリケーション状態
+    let state = {
+      targetDate: '2026-11-23',
+      shows: [],
+      categoryFilter: 'all',
+      viewMode: 'all', // 'all' (候補も表示) | 'selected' (決定回のみ)
+      splitLanes: true, // true: 左レーン「見る演目」／ 右レーン「見ない演目」
+      zoomIndex: 1,     // 0: 標準, 1: 広め, 2: 特大
+      mobileTab: 'calendar',
+      firstOverlapMin: null,
+      modalTimes: [],
+    };
+
+    window.USJSyncState = {
+      roomId: 'USJ-1123',
+    };
+
+    // URLハッシュの読み書き（合言葉＆フォールバック状態共有）
+    function parseHashParams() {
+      const hash = (window.location.hash || '').replace(/^#/, '');
+      const params = new URLSearchParams(hash);
+      return {
+        room: params.get('room') || '',
+        data: params.get('data') || '',
+      };
+    }
+
+    function updateUrlHash() {
+      try {
+        const params = new URLSearchParams();
+        params.set('room', window.USJSyncState.roomId || 'USJ-1123');
+        history.replaceState(null, '', `#${params.toString()}`);
+      } catch (e) {
+        // iframe環境などでhistory制限がある場合は無視
+      }
+    }
+
+    // トースト通知表示
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const el = document.createElement('div');
+      const bgMap = {
+        success: 'bg-emerald-900 text-white border-emerald-700',
+        warn: 'bg-amber-500 text-slate-950 border-amber-600',
+        info: 'bg-slate-900 text-white border-slate-700',
+      };
+      el.className = `toast-enter px-4 py-2 rounded-full text-xs font-extrabold shadow-xl border ${
+        bgMap[type] || bgMap.info
+      }`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => el.remove(), 260);
+      }, 2400);
+    }
+
+    // 状態保存・読込（インメモリ＋リアルタイム同期＋URLハッシュ）
+    function saveState() {
+      updateUrlHash();
+      if (window.USJSync && typeof window.USJSync.pushState === 'function') {
+        window.USJSync.pushState();
+      }
+    }
+
+    function loadState() {
+      const { room, data } = parseHashParams();
+      if (room) {
+        window.USJSyncState.roomId = room.trim().replace(/\//g, '_').slice(0, 40) || 'USJ-1123';
+      }
+
+      if (data) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(escape(atob(data))));
+          if (decoded && Array.isArray(decoded.shows) && decoded.shows.length > 0) {
+            state.targetDate = decoded.targetDate || '2026-11-23';
+            state.shows = decoded.shows;
+            const dateInput = document.getElementById('schedule-date');
+            if (dateInput) dateInput.value = state.targetDate;
+            updateSourceBadge(state.targetDate);
+            updateUrlHash();
+            return;
+          }
+        } catch (e) {
+          console.warn('Hash state decode failed:', e);
+        }
+      }
+
+      state.targetDate = '2026-11-23';
+      state.shows = getScheduleForDate(state.targetDate);
+      updateSourceBadge(state.targetDate);
+      updateUrlHash();
+    }
+
+    // 同期モジュール用のデータ入出力ブリッジ
+    window.getExportableScheduleData = function () {
+      return {
+        targetDate: state.targetDate,
+        shows: state.shows,
+      };
+    };
+
+    window.applyRemoteScheduleData = function (remoteData) {
+      if (!remoteData || !Array.isArray(remoteData.shows)) return;
+      state.targetDate = remoteData.targetDate || state.targetDate;
+      state.shows = remoteData.shows;
+      const dateInput = document.getElementById('schedule-date');
+      if (dateInput) dateInput.value = state.targetDate;
+      updateSourceBadge(state.targetDate);
+      renderAll();
+    };
+
+    function updateSourceBadge(dateStr) {
+      const textEl = document.getElementById('schedule-source-text');
+      if (!textEl) return;
+      const formatted = (dateStr || '2026-11-23').replace(/-/g, '/');
+      const isWWOff = dateStr >= '2026-11-28' && dateStr <= '2026-12-25';
+      textEl.textContent = isWWOff
+        ? `${formatted} 反映済（WW休止期間）`
+        : `${formatted} 公演スケジュール反映済`;
+    }
+
+    // 日付更新（最新スケジュール取得）
+    function fetchScheduleForSelectedDate() {
+      const dateInput = document.getElementById('schedule-date');
+      const nextDate = dateInput ? dateInput.value : state.targetDate;
+      if (!nextDate) {
+        showToast('日付を選択してください', 'warn');
+        return;
+      }
+
+      const iconEl = document.getElementById('fetch-icon');
+      if (iconEl) iconEl.classList.add('animate-spin');
+
+      // 既存の演目ごとのON/OFF設定を引き継ぐ
+      const enabledMap = new Map();
+      state.shows.forEach((s) => enabledMap.set(s.id, s.enabled));
+
+      const freshShows = getScheduleForDate(nextDate).map((s) => {
+        if (enabledMap.has(s.id)) {
+          return { ...s, enabled: enabledMap.get(s.id) };
+        }
+        return s;
+      });
+
+      setTimeout(() => {
+        if (iconEl) iconEl.classList.remove('animate-spin');
+        state.targetDate = nextDate;
+        state.shows = freshShows;
+        updateSourceBadge(nextDate);
+        saveState();
+        renderAll();
+        showToast(`${nextDate.replace(/-/g, '/')} のスケジュールに更新しました`, 'success');
+      }, 280);
+    }
+
+    // 選択中の公演と重複するスロットIDセットを取得
+    function getOverlappingTimeIds() {
+      const selectedEvents = [];
+      state.shows.forEach((show) => {
+        if (!show.enabled) return;
+        show.times.forEach((slot) => {
+          if (slot.selected) {
+            const start = timeToMinutes(slot.time);
+            const end = start + (Number(show.duration) || 20);
+            selectedEvents.push({
+              showId: show.id,
+              timeId: slot.id,
+              start,
+              end,
+            });
+          }
+        });
+      });
+
+      const overlappingIds = new Set();
+      let earliestOverlap = null;
+
+      for (let i = 0; i < selectedEvents.length; i++) {
+        for (let j = i + 1; j < selectedEvents.length; j++) {
+          const a = selectedEvents[i];
+          const b = selectedEvents[j];
+          if (a.start < b.end && b.start < a.end) {
+            overlappingIds.add(a.timeId);
+            overlappingIds.add(b.timeId);
+            const minStart = Math.min(a.start, b.start);
+            if (earliestOverlap === null || minStart < earliestOverlap) {
+              earliestOverlap = minStart;
+            }
+          }
+        }
+      }
+
+      state.firstOverlapMin = earliestOverlap;
+      return overlappingIds;
+    }
+
+    // 時間重複の自動調整
+    function autoResolveOverlaps() {
+      const overlappingIds = getOverlappingTimeIds();
+      if (overlappingIds.size === 0) {
+        showToast('時間の重複はありません', 'info');
+        return;
+      }
+
+      // 確定済みのうち重複していない時間帯を基準にする
+      const fixedIntervals = [];
+      state.shows.forEach((show) => {
+        if (!show.enabled) return;
+        show.times.forEach((slot) => {
+          if (slot.selected && !overlappingIds.has(slot.id)) {
+            const s = timeToMinutes(slot.time);
+            fixedIntervals.push({ start: s, end: s + (Number(show.duration) || 20) });
+          }
+        });
+      });
+
+      let resolvedCount = 0;
+      state.shows.forEach((show) => {
+        if (!show.enabled) return;
+        const dur = Number(show.duration) || 20;
+        show.times.forEach((slot) => {
+          if (slot.selected && overlappingIds.has(slot.id)) {
+            const curStart = timeToMinutes(slot.time);
+            const curEnd = curStart + dur;
+            const hasConflict = fixedIntervals.some(
+              (iv) => curStart < iv.end + 5 && iv.start < curEnd + 5
+            );
+            if (!hasConflict) {
+              fixedIntervals.push({ start: curStart, end: curEnd });
+              return;
+            }
+
+            // 別時間帯の空き回を探す
+            const candidate = show.times.find((alt) => {
+              if (alt.selected) return false;
+              const aStart = timeToMinutes(alt.time);
+              const aEnd = aStart + dur;
+              return !fixedIntervals.some((iv) => aStart < iv.end + 5 && iv.start < aEnd + 5);
+            });
+
+            if (candidate) {
+              slot.selected = false;
+              candidate.selected = true;
+              const cStart = timeToMinutes(candidate.time);
+              fixedIntervals.push({ start: cStart, end: cStart + dur });
+              resolvedCount++;
+            } else {
+              fixedIntervals.push({ start: curStart, end: curEnd });
+            }
+          }
+        });
+      });
+
+      saveState();
+      renderAll();
+      if (resolvedCount > 0) {
+        showToast(`${resolvedCount}件の公演時間を空き時間へ調整しました`, 'success');
+      } else {
+        showToast('空き時間の別回が見つかりませんでした（手動で調整してください）', 'warn');
+      }
+    }
+
+    // 演目ごとのON/OFF切替
+    function toggleShowEnabled(showId) {
+      const show = state.shows.find((s) => s.id === showId);
+      if (!show) return;
+      show.enabled = !show.enabled;
+      if (!show.enabled) {
+        // 「見ない」に移した時は時間選択も解除
+        show.times.forEach((t) => {
+          t.selected = false;
+        });
+      }
+      saveState();
+      renderAll();
+    }
+
+    // 個別公演回（時間）のON/OFF切替
+    function toggleTimeSlot(showId, timeId) {
+      const show = state.shows.find((s) => s.id === showId);
+      if (!show) return;
+      const slot = show.times.find((t) => t.id === timeId);
+      if (!slot) return;
+
+      if (!show.enabled) {
+        // 「見ない」演目の時間ブロックをタップした場合は「見る」に昇格してその時間を選択
+        show.enabled = true;
+        slot.selected = true;
+        showToast(`「${show.title}」の ${slot.time} を予定に追加しました`, 'success');
+      } else {
+        slot.selected = !slot.selected;
+      }
+
+      saveState();
+      renderAll();
+    }
+
+    // 上部サマリー＆警告バー更新
+    function renderSummary() {
+      let enabledShowCount = 0;
+      let selectedSlotCount = 0;
+      let minStart = null;
+      let maxEnd = null;
+
+      state.shows.forEach((show) => {
+        if (!show.enabled) return;
+        enabledShowCount++;
+        show.times.forEach((slot) => {
+          if (slot.selected) {
+            selectedSlotCount++;
+            const s = timeToMinutes(slot.time);
+            const e = s + (Number(show.duration) || 20);
+            if (minStart === null || s < minStart) minStart = s;
+            if (maxEnd === null || e > maxEnd) maxEnd = e;
+          }
+        });
+      });
+
+      const showCountEl = document.getElementById('summary-show-count');
+      const slotCountEl = document.getElementById('summary-slot-count');
+      const timeRangeWrap = document.getElementById('summary-time-range');
+      const timeTextEl = document.getElementById('summary-time-text');
+
+      if (showCountEl) showCountEl.textContent = `${enabledShowCount}演目`;
+      if (slotCountEl) slotCountEl.textContent = `${selectedSlotCount}公演`;
+
+      if (timeRangeWrap && timeTextEl) {
+        if (minStart !== null && maxEnd !== null) {
+          timeRangeWrap.classList.remove('hidden');
+          timeTextEl.textContent = `${minutesToTime(minStart)} ～ ${minutesToTime(maxEnd)}`;
+        } else {
+          timeRangeWrap.classList.add('hidden');
+        }
+      }
+
+      const overlappingIds = getOverlappingTimeIds();
+      const overlapBanner = document.getElementById('overlap-banner');
+      const overlapText = document.getElementById('overlap-banner-text');
+      const noOverlapBadge = document.getElementById('no-overlap-badge');
+
+      if (overlapBanner && noOverlapBadge) {
+        if (overlappingIds.size > 0) {
+          overlapBanner.classList.remove('hidden');
+          overlapBanner.classList.add('flex');
+          noOverlapBadge.classList.add('hidden');
+          if (overlapText) overlapText.textContent = `時間重複あり(${overlappingIds.size}件)`;
+        } else {
+          overlapBanner.classList.add('hidden');
+          overlapBanner.classList.remove('flex');
+          noOverlapBadge.classList.remove('hidden');
+        }
+      }
+    }
+
+    // 演目リスト（左：見るON ／ 右：見ないOFF）の描画
+    function renderShowList() {
+      const onContainer = document.getElementById('show-list-on');
+      const offContainer = document.getElementById('show-list-off');
+      const onCountEl = document.getElementById('on-column-count');
+      const offCountEl = document.getElementById('off-column-count');
+      if (!onContainer || !offContainer) return;
+
+      const filtered = state.shows.filter((s) =>
+        state.categoryFilter === 'all' ? true : s.category === state.categoryFilter
+      );
+
+      const onShows = filtered.filter((s) => s.enabled);
+      const offShows = filtered.filter((s) => !s.enabled);
+
+      if (onCountEl) onCountEl.textContent = `${onShows.length}件`;
+      if (offCountEl) offCountEl.textContent = `${offShows.length}件`;
+
+      onContainer.innerHTML =
+        onShows.length > 0
+          ? onShows.map((show) => createShowCardHtml(show, true)).join('')
+          : `<div class="text-center py-6 text-xs text-emerald-800/60 font-semibold">「見る」演目がありません<br/>右列から追加してください</div>`;
+
+      offContainer.innerHTML =
+        offShows.length > 0
+          ? offShows.map((show) => createShowCardHtml(show, false)).join('')
+          : `<div class="text-center py-6 text-xs text-slate-500 font-semibold">すべて「見る」に入っています</div>`;
+    }
+
+    function createShowCardHtml(show, isOn) {
+      const cat = CATEGORY_META[show.category] || CATEGORY_META.show;
+      const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
+      const selectedCount = show.times.filter((t) => t.selected).length;
+
+      const countBadge =
+        isOn && selectedCount > 0
+          ? `<span class="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold ${
+              selectedCount >= 2 ? 'bg-amber-400 text-slate-950' : 'bg-emerald-600 text-white'
+            }">✅ ${selectedCount}回ON</span>`
+          : '';
+
+      const timesHtml =
+        show.times.length > 0
+          ? `<div class="flex flex-wrap gap-1 mt-2">
+              ${show.times
+                .map((slot) => {
+                  const chipCls = slot.selected ? theme.chipSelected : theme.chipUnselected;
+                  return `<button type="button" data-action="toggle-slot" data-show-id="${escapeHtml(
+                    show.id
+                  )}" data-time-id="${escapeHtml(slot.id)}"
+                    class="px-2 py-1 rounded-lg text-[11px] font-bold border transition active:scale-95 cursor-pointer ${chipCls}">
+                    ${slot.selected ? '✅ ' : ''}${escapeHtml(slot.time)}
+                  </button>`;
+                })
+                .join('')}
+            </div>`
+          : `<div class="mt-1.5 text-[11px] text-slate-500 bg-slate-100 px-2 py-1 rounded-lg">
+              🕒 随時運営（時間編集から予定時刻を追加可）
+            </div>`;
+
+      return `
+        <article class="bg-white rounded-xl p-2.5 shadow-xs border ${
+          isOn ? 'border-emerald-300' : 'border-slate-200/90 opacity-90'
+        } transition">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-1 flex-wrap mb-0.5">
+                ${countBadge}
+                <span class="text-[10px] text-slate-400 font-semibold">約${show.duration}分</span>
+              </div>
+              <h3 class="text-xs sm:text-[13px] font-extrabold text-slate-900 leading-snug">
+                <span class="mr-0.5">${cat.icon}</span>${escapeHtml(show.title)}
+              </h3>
+              <p class="text-[10px] text-slate-500 mt-0.5 truncate">📍 ${escapeHtml(show.area || 'パーク内')}</p>
+            </div>
+
+            <div class="flex flex-col items-end gap-1 shrink-0">
+              <button type="button" data-action="toggle-enabled" data-show-id="${escapeHtml(show.id)}"
+                class="px-2 py-1 rounded-lg text-[11px] font-extrabold transition active:scale-95 cursor-pointer ${
+                  isOn
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
+                }">
+                ${isOn ? '見ない →' : '← 見る'}
+              </button>
+              <button type="button" data-action="edit-show" data-show-id="${escapeHtml(show.id)}"
+                class="text-[10px] text-slate-400 hover:text-blue-700 font-bold px-1.5 py-0.5 rounded hover:bg-slate-100 transition cursor-pointer">
+                ✏️ 時間編集
+              </button>
+            </div>
+          </div>
+          ${timesHtml}
+        </article>
+      `;
+    }
+
+    // レーン内イベントの重なりカラム計算（Greedy Interval Coloring）
+    function layoutLaneEvents(events) {
+      if (!events || events.length === 0) return [];
+      const sorted = [...events].sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+
+      const groups = [];
+      let currentGroup = [];
+      let groupMaxEnd = -1;
+
+      sorted.forEach((ev) => {
+        if (currentGroup.length === 0) {
+          currentGroup.push(ev);
+          groupMaxEnd = ev.endMin;
+        } else if (ev.startMin < groupMaxEnd) {
+          currentGroup.push(ev);
+          groupMaxEnd = Math.max(groupMaxEnd, ev.endMin);
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [ev];
+          groupMaxEnd = ev.endMin;
+        }
+      });
+      if (currentGroup.length > 0) groups.push(currentGroup);
+
+      const positioned = [];
+      groups.forEach((group) => {
+        const colEnds = [];
+        group.forEach((ev) => {
+          let colIndex = colEnds.findIndex((endT) => endT <= ev.startMin);
+          if (colIndex === -1) {
+            colIndex = colEnds.length;
+            colEnds.push(ev.endMin);
+          } else {
+            colEnds[colIndex] = ev.endMin;
+          }
+          ev._colIndex = colIndex;
+        });
+        const totalCols = Math.max(1, colEnds.length);
+        group.forEach((ev) => {
+          positioned.push({
+            ...ev,
+            colIndex: ev._colIndex,
+            totalCols,
+          });
+        });
+      });
+
+      return positioned;
+    }
+
+    // 時間軸カレンダーの描画
+    function renderCalendar() {
+      const wrapper = document.getElementById('calendar-canvas-wrapper');
+      const scrollArea = document.getElementById('calendar-scroll-area');
+      if (!wrapper || !scrollArea) return;
+
+      const zoom = ZOOM_LEVELS[state.zoomIndex] || ZOOM_LEVELS[1];
+      const pxPerHour = zoom.pxPerHour;
+      const pxPerMin = pxPerHour / 60;
+      const totalHours = END_HOUR - START_HOUR;
+      const gridHeight = totalHours * pxPerHour;
+      const overlappingIds = getOverlappingTimeIds();
+
+      // 演目ごとの選択回数マップ（✅1回, ✅2回... 表示用）
+      const showSelectedCountMap = new Map();
+      state.shows.forEach((s) => {
+        const cnt = s.times.filter((t) => t.selected).length;
+        showSelectedCountMap.set(s.id, cnt);
+      });
+
+      // イベント収集
+      const leftEvents = [];
+      const rightEvents = [];
+
+      state.shows.forEach((show) => {
+        if (state.categoryFilter !== 'all' && show.category !== state.categoryFilter) return;
+        const dur = Number(show.duration) || 20;
+
+        show.times.forEach((slot) => {
+          if (state.viewMode === 'selected' && !(show.enabled && slot.selected)) {
+            return;
+          }
+          const startMin = timeToMinutes(slot.time);
+          const endMin = startMin + dur;
+          if (endMin <= START_HOUR * 60 || startMin >= END_HOUR * 60) return;
+
+          const item = {
+            show,
+            slot,
+            startMin,
+            endMin,
+            isSelected: show.enabled && slot.selected,
+            selectedTotalCount: showSelectedCountMap.get(show.id) || 0,
+            isConflict: show.enabled && slot.selected && overlappingIds.has(slot.id),
+          };
+
+          if (!state.splitLanes || state.viewMode === 'selected') {
+            leftEvents.push(item);
+          } else if (show.enabled) {
+            leftEvents.push(item);
+          } else {
+            rightEvents.push(item);
+          }
+        });
+      });
+
+      const showRightLane = state.splitLanes && state.viewMode !== 'selected';
+      const isMobile = window.innerWidth < 1024;
+      const timeColWidth = isMobile ? 48 : 58;
+      const containerWidth = Math.max(300, scrollArea.clientWidth || 360);
+
+      // スマホ時は左レーンだけで画面幅いっぱいを使い、右レーンは横スクロールで表示
+      const leftLaneWidth = isMobile
+        ? Math.max(250, containerWidth - timeColWidth)
+        : showRightLane
+        ? Math.max(260, Math.floor((containerWidth - timeColWidth) * 0.62))
+        : Math.max(300, containerWidth - timeColWidth);
+
+      const rightLaneWidth = showRightLane
+        ? isMobile
+          ? Math.max(220, Math.floor(leftLaneWidth * 0.78))
+          : Math.max(200, containerWidth - timeColWidth - leftLaneWidth)
+        : 0;
+
+      const totalCanvasWidth = timeColWidth + leftLaneWidth + rightLaneWidth;
+
+      // 時間軸目盛りHTML生成（1時間・30分・15分刻み）
+      let timeAxisHtml = '';
+      let gridLinesHtml = '';
+      for (let h = START_HOUR; h <= END_HOUR; h++) {
+        const topPx = (h - START_HOUR) * pxPerHour;
+        timeAxisHtml += `
+          <div class="absolute left-0 right-0 flex items-start justify-end pr-1.5 -translate-y-2" style="top: ${topPx}px;">
+            <span class="text-[11px] font-extrabold text-slate-700 bg-slate-50/90 px-0.5 rounded">${String(h).padStart(2, '0')}:00</span>
+          </div>
+        `;
+        if (h < END_HOUR) {
+          gridLinesHtml += `<div class="absolute left-0 right-0 border-t border-slate-300/90" style="top: ${topPx}px;"></div>`;
+
+          // 15分・30分・45分補助線
+          [15, 30, 45].forEach((minOffset) => {
+            const subTop = topPx + minOffset * pxPerMin;
+            const isHalf = minOffset === 30;
+            gridLinesHtml += `<div class="absolute left-0 right-0 border-t ${
+              isHalf ? 'border-slate-200 border-dashed' : 'border-slate-100'
+            }" style="top: ${subTop}px;"></div>`;
+
+            if (isHalf || pxPerHour >= 200) {
+              timeAxisHtml += `
+                <div class="absolute left-0 right-0 flex items-start justify-end pr-1.5 -translate-y-1.5" style="top: ${subTop}px;">
+                  <span class="text-[9px] ${isHalf ? 'font-bold text-slate-500' : 'text-slate-400'}">:${minOffset}</span>
+                </div>
+              `;
+            }
+          });
+        }
+      }
+
+      // イベントカードHTML生成関数
+      function renderLaneBlocks(positionedEvents) {
+        return positionedEvents
+          .map((ev) => {
+            const clampedStart = Math.max(START_HOUR * 60, ev.startMin);
+            const clampedEnd = Math.min(END_HOUR * 60, ev.endMin);
+            const topPx = (clampedStart - START_HOUR * 60) * pxPerMin + 1;
+            const heightPx = Math.max(28, (clampedEnd - clampedStart) * pxPerMin - 2);
+
+            const colWidthPct = 100 / ev.totalCols;
+            const leftPct = ev.colIndex * colWidthPct;
+
+            const theme = COLOR_THEMES[ev.show.color] || COLOR_THEMES.blue;
+            const cat = CATEGORY_META[ev.show.category] || CATEGORY_META.show;
+            const cardStyle = ev.isSelected ? theme.bgSelected : theme.bgCandidate;
+            const conflictCls = ev.isConflict ? 'conflict-card ring-2 ring-red-500' : '';
+
+            // 選択回数バッジ（✅1回, ✅2回...）
+            let statusBadge = '';
+            if (ev.isSelected) {
+              const countLabel = `✅${ev.selectedTotalCount}回`;
+              const badgeColor =
+                ev.selectedTotalCount >= 2
+                  ? 'bg-amber-300 text-slate-950 border border-amber-500'
+                  : 'bg-white/95 text-slate-900';
+              statusBadge = `<span class="px-1 py-0.2 rounded text-[9px] font-extrabold shrink-0 leading-tight ${badgeColor}">${countLabel}</span>`;
+            } else if (ev.show.enabled) {
+              statusBadge = `<span class="px-1 py-0.2 rounded text-[8px] font-bold bg-white/80 text-slate-600 border border-slate-300/80 shrink-0 leading-tight">候補</span>`;
+            }
+
+            const endTimeStr = minutesToTime(ev.endMin);
+            const showEndTime = heightPx >= 46 && ev.totalCols <= 2;
+            const showArea = heightPx >= 64;
+
+            return `
+              <div style="top: ${topPx}px; height: ${heightPx}px; left: calc(${leftPct}% + 2px); width: calc(${colWidthPct}% - 4px);"
+                class="absolute z-10">
+                <button type="button"
+                  data-action="toggle-slot"
+                  data-show-id="${escapeHtml(ev.show.id)}"
+                  data-time-id="${escapeHtml(ev.slot.id)}"
+                  title="${escapeHtml(ev.slot.time)}～${endTimeStr} ${escapeHtml(ev.show.title)}"
+                  class="w-full h-full rounded-lg border-l-4 border px-1.5 py-1 text-left flex flex-col justify-between overflow-hidden transition active:scale-[0.98] shadow-xs cursor-pointer ${cardStyle} ${conflictCls}">
+                  <div>
+                    <div class="flex items-center justify-between gap-0.5 leading-none">
+                      <span class="text-[10px] sm:text-[11px] font-extrabold tracking-tight shrink-0">
+                        ${escapeHtml(ev.slot.time)}${showEndTime ? `<span class="opacity-80 font-semibold">-${endTimeStr}</span>` : ''}
+                      </span>
+                      ${statusBadge}
+                    </div>
+                    <div class="mt-0.5 text-[10px] sm:text-[11px] font-extrabold leading-tight break-words line-clamp-2">
+                      ${cat.icon}${escapeHtml(ev.show.title)}
+                    </div>
+                  </div>
+                  ${
+                    showArea
+                      ? `<div class="text-[9px] opacity-80 truncate leading-none">📍${escapeHtml(ev.show.area || '')}</div>`
+                      : ''
+                  }
+                </button>
+              </div>
+            `;
+          })
+          .join('');
+      }
+
+      const leftPositioned = layoutLaneEvents(leftEvents);
+      const rightPositioned = layoutLaneEvents(rightEvents);
+
+      const leftHeaderLabel =
+        !state.splitLanes || state.viewMode === 'selected'
+          ? '📅 鑑賞スケジュール'
+          : '✅ 見る演目（タップで時間選択）';
+
+      const rightHintHtml =
+        showRightLane && isMobile
+          ? `<span class="text-[9px] text-slate-500 font-bold">見ないは右へ →</span>`
+          : '';
+
+      wrapper.style.width = `${totalCanvasWidth}px`;
+      wrapper.innerHTML = `
+        <!-- スティッキーレーンヘッダー -->
+        <div class="sticky top-0 z-30 flex bg-slate-100 border-b border-slate-300 shadow-2xs" style="width: ${totalCanvasWidth}px;">
+          <div class="sticky left-0 z-40 bg-slate-100 border-r border-slate-300 flex items-center justify-center text-[10px] font-extrabold text-slate-600 py-1.5 shrink-0"
+            style="width: ${timeColWidth}px;">
+            時間
+          </div>
+          <div class="bg-emerald-50/95 border-r border-slate-300 px-2 py-1.5 flex items-center justify-between gap-1 shrink-0"
+            style="width: ${leftLaneWidth}px;">
+            <span class="text-[11px] sm:text-xs font-extrabold text-emerald-950 truncate">${leftHeaderLabel}</span>
+            ${rightHintHtml}
+          </div>
+          ${
+            showRightLane
+              ? `<div class="bg-slate-200/90 px-2 py-1.5 flex items-center justify-between gap-1 shrink-0"
+                  style="width: ${rightLaneWidth}px;">
+                  <span class="text-[11px] sm:text-xs font-extrabold text-slate-700 truncate">🙈 見ない演目</span>
+                </div>`
+              : ''
+          }
+        </div>
+
+        <!-- タイムグリッド本体 -->
+        <div class="relative flex" style="width: ${totalCanvasWidth}px; height: ${gridHeight}px;">
+          <!-- 左端固定の時間軸 -->
+          <div class="sticky left-0 z-20 bg-slate-50 border-r border-slate-300 shrink-0"
+            style="width: ${timeColWidth}px; height: ${gridHeight}px;">
+            ${timeAxisHtml}
+          </div>
+
+          <!-- 左レーン：見る演目 -->
+          <div class="relative bg-white border-r border-slate-300 shrink-0"
+            style="width: ${leftLaneWidth}px; height: ${gridHeight}px;">
+            ${gridLinesHtml}
+            ${renderLaneBlocks(leftPositioned)}
+          </div>
+
+          <!-- 右レーン：見ない演目 -->
+          ${
+            showRightLane
+              ? `<div class="relative bg-slate-100/70 shrink-0"
+                  style="width: ${rightLaneWidth}px; height: ${gridHeight}px;">
+                  ${gridLinesHtml}
+                  ${renderLaneBlocks(rightPositioned)}
+                </div>`
+              : ''
+          }
+        </div>
+      `;
+    }
+
+    // 全体再描画
+    function renderAll() {
+      renderSummary();
+      renderShowList();
+      renderCalendar();
+
+      // コントロールボタンの表示状態同期
+      const lanesBtn = document.getElementById('btn-toggle-lanes');
+      if (lanesBtn) {
+        lanesBtn.textContent = state.splitLanes ? '✅｜🙈 2列比較中' : '📅 1列統合中';
+      }
+      const zoomBtn = document.getElementById('btn-zoom-scale');
+      if (zoomBtn) {
+        const z = ZOOM_LEVELS[state.zoomIndex] || ZOOM_LEVELS[1];
+        zoomBtn.textContent = `↕ 縦幅: ${z.label}`;
+      }
+
+      const modeAllBtn = document.getElementById('view-mode-all');
+      const modeSelBtn = document.getElementById('view-mode-selected');
+      if (modeAllBtn && modeSelBtn) {
+        if (state.viewMode === 'all') {
+          modeAllBtn.className = 'px-2 py-0.5 rounded-md bg-white text-blue-900 shadow-xs transition cursor-pointer';
+          modeSelBtn.className = 'px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition cursor-pointer';
+        } else {
+          modeSelBtn.className = 'px-2 py-0.5 rounded-md bg-white text-blue-900 shadow-xs transition cursor-pointer';
+          modeAllBtn.className = 'px-2 py-0.5 rounded-md text-slate-600 hover:text-slate-900 transition cursor-pointer';
+        }
+      }
+    }
+
+    // LINE共有用テキスト生成＆クリップボードコピー
+    function copyPlanToClipboard() {
+      const items = [];
+      state.shows.forEach((show) => {
+        if (!show.enabled) return;
+        const cat = CATEGORY_META[show.category] || CATEGORY_META.show;
+        show.times.forEach((slot) => {
+          if (slot.selected) {
+            const startMin = timeToMinutes(slot.time);
+            const endStr = minutesToTime(startMin + (Number(show.duration) || 20));
+            items.push({
+              startMin,
+              text: `${slot.time}～${endStr} ${cat.icon}${show.title}（${show.area || 'パーク内'}）`,
+            });
+          }
+        });
+      });
+
+      if (items.length === 0) {
+        showToast('カレンダーで公演時間を1つ以上ONにしてください', 'warn');
+        return;
+      }
+
+      items.sort((a, b) => a.startMin - b.startMin);
+      const dateLabel = (state.targetDate || '2026-11-23').replace(/-/g, '/');
+      const output = [
+        `🌐 USJ ショー鑑賞スケジュール (${dateLabel})`,
+        `──────────────────`,
+        ...items.map((it) => `・${it.text}`),
+        `──────────────────`,
+        `合計: ${items.length}公演`,
+      ].join('\n');
+
+      const textarea = document.createElement('textarea');
+      textarea.value = output;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('LINE共有用スケジュールをコピーしました！', 'success');
+      } catch (e) {
+        showToast('コピーに失敗しました', 'warn');
+      } finally {
+        textarea.remove();
+      }
+    }
+
+    // 演目追加・編集モーダル操作
+    function openShowModal(showId = null) {
+      const overlay = document.getElementById('modal-overlay');
+      const titleEl = document.getElementById('modal-title');
+      const idInput = document.getElementById('edit-show-id');
+      const nameInput = document.getElementById('input-title');
+      const areaInput = document.getElementById('input-area');
+      const durInput = document.getElementById('input-duration');
+      const catInput = document.getElementById('input-category');
+      const colorInput = document.getElementById('input-color');
+      const deleteBtn = document.getElementById('btn-delete-show');
+
+      if (!overlay) return;
+
+      if (showId) {
+        const show = state.shows.find((s) => s.id === showId);
+        if (!show) return;
+        titleEl.textContent = '演目・公演時間の編集';
+        idInput.value = show.id;
+        nameInput.value = show.title;
+        areaInput.value = show.area || '';
+        durInput.value = show.duration || 25;
+        catInput.value = show.category || 'show';
+        colorInput.value = show.color || 'blue';
+        state.modalTimes = show.times.map((t) => ({ ...t }));
+        deleteBtn.classList.remove('hidden');
+      } else {
+        titleEl.textContent = '新しい演目を追加';
+        idInput.value = '';
+        nameInput.value = '';
+        areaInput.value = '';
+        durInput.value = 25;
+        catInput.value = 'show';
+        colorInput.value = 'blue';
+        state.modalTimes = [];
+        deleteBtn.classList.add('hidden');
+      }
+
+      renderModalTimeChips();
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function closeShowModal() {
+      const overlay = document.getElementById('modal-overlay');
+      if (!overlay) return;
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    function renderModalTimeChips() {
+      const container = document.getElementById('modal-time-chips');
+      if (!container) return;
+      if (state.modalTimes.length === 0) {
+        container.innerHTML = `<span class="text-xs text-slate-400">時刻が登録されていません</span>`;
+        return;
+      }
+      state.modalTimes.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+      container.innerHTML = state.modalTimes
+        .map(
+          (t, idx) => `
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-xs font-bold text-slate-800">
+            ${escapeHtml(t.time)}
+            <button type="button" data-remove-time-idx="${idx}" class="text-red-500 hover:text-red-700 font-extrabold ml-0.5 cursor-pointer">✕</button>
+          </span>
+        `
+        )
+        .join('');
+    }
+
+    // モバイルタブ切替
+    function switchMobileTab(tab) {
+      state.mobileTab = tab;
+      const listPanel = document.getElementById('panel-list');
+      const calPanel = document.getElementById('panel-calendar');
+      const tabListBtn = document.getElementById('tab-list');
+      const tabCalBtn = document.getElementById('tab-calendar');
+      if (!listPanel || !calPanel) return;
+
+      if (tab === 'list') {
+        listPanel.classList.remove('hidden');
+        listPanel.classList.add('flex');
+        calPanel.classList.add('hidden');
+        calPanel.classList.remove('flex');
+        if (tabListBtn) {
+          tabListBtn.className = 'py-1 px-2 rounded-md text-[11px] font-bold transition bg-white text-blue-900 shadow-xs cursor-pointer';
+        }
+        if (tabCalBtn) {
+          tabCalBtn.className = 'py-1 px-2 rounded-md text-[11px] font-bold transition text-slate-600 hover:text-slate-900 cursor-pointer';
+        }
+      } else {
+        listPanel.classList.add('hidden');
+        listPanel.classList.remove('flex');
+        calPanel.classList.remove('hidden');
+        calPanel.classList.add('flex');
+        if (tabCalBtn) {
+          tabCalBtn.className = 'py-1 px-2 rounded-md text-[11px] font-bold transition bg-white text-blue-900 shadow-xs cursor-pointer';
+        }
+        if (tabListBtn) {
+          tabListBtn.className = 'py-1 px-2 rounded-md text-[11px] font-bold transition text-slate-600 hover:text-slate-900 cursor-pointer';
+        }
+        renderCalendar();
+      }
+    }
+
+    // イベントリスナー登録＆初期化
+    function initApp() {
+      loadState();
+      renderAll();
+      if (window.innerWidth < 1024) {
+        switchMobileTab(state.mobileTab);
+      }
+
+      // 日付更新ボタン
+      const fetchBtn = document.getElementById('btn-fetch-schedule');
+      if (fetchBtn) {
+        fetchBtn.addEventListener('click', fetchScheduleForSelectedDate);
+      }
+
+      // コピーボタン
+      const copyBtn = document.getElementById('btn-copy-plan');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', copyPlanToClipboard);
+      }
+
+      // リセットボタン
+      const resetBtn = document.getElementById('btn-reset-default');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          state.targetDate = '2026-11-23';
+          const dateInput = document.getElementById('schedule-date');
+          if (dateInput) dateInput.value = state.targetDate;
+          state.shows = getScheduleForDate(state.targetDate);
+          updateSourceBadge(state.targetDate);
+          saveState();
+          renderAll();
+          showToast('初期設定（おすすめ6演目ON）に戻しました', 'info');
+        });
+      }
+
+      // リアルタイム同期モーダル操作
+      const syncOverlay = document.getElementById('sync-modal-overlay');
+      const openSyncModal = () => {
+        if (!syncOverlay) return;
+        if (window.USJSync && window.USJSync.refreshUI) window.USJSync.refreshUI();
+        syncOverlay.classList.remove('hidden');
+        syncOverlay.classList.add('flex');
+      };
+      const closeSyncModal = () => {
+        if (!syncOverlay) return;
+        syncOverlay.classList.add('hidden');
+        syncOverlay.classList.remove('flex');
+      };
+
+      const syncBtn = document.getElementById('btn-sync-modal');
+      const roomBadgeBtn = document.getElementById('badge-room-id');
+      const syncCloseBtn = document.getElementById('sync-modal-close');
+      if (syncBtn) syncBtn.addEventListener('click', openSyncModal);
+      if (roomBadgeBtn) roomBadgeBtn.addEventListener('click', openSyncModal);
+      if (syncCloseBtn) syncCloseBtn.addEventListener('click', closeSyncModal);
+      if (syncOverlay) {
+        syncOverlay.addEventListener('click', (e) => {
+          if (e.target === syncOverlay) closeSyncModal();
+        });
+      }
+
+      // 新しい合言葉をランダム発行
+      const newRandomRoomBtn = document.getElementById('btn-new-random-room');
+      if (newRandomRoomBtn) {
+        newRandomRoomBtn.addEventListener('click', async () => {
+          const randNum = Math.floor(1000 + Math.random() * 9000);
+          const nextRoom = `USJ-${randNum}`;
+          window.USJSyncState.roomId = nextRoom;
+          updateUrlHash();
+          if (window.USJSync && window.USJSync.switchRoom) {
+            await window.USJSync.switchRoom(nextRoom);
+          }
+          showToast(`新しい合言葉「${nextRoom}」を発行しました`, 'success');
+        });
+      }
+
+      // 合言葉のみコピー
+      const copyRoomCodeBtn = document.getElementById('btn-copy-room-code');
+      if (copyRoomCodeBtn) {
+        copyRoomCodeBtn.addEventListener('click', () => {
+          const code = window.USJSyncState.roomId || 'USJ-1123';
+          const ta = document.createElement('textarea');
+          ta.value = code;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            showToast(`合言葉「${code}」をコピーしました`, 'success');
+          } finally {
+            ta.remove();
+          }
+        });
+      }
+
+      // 招待リンク（合言葉＆状態入りURL）コピー
+      const copyInviteLinkBtn = document.getElementById('btn-copy-invite-link');
+      if (copyInviteLinkBtn) {
+        copyInviteLinkBtn.addEventListener('click', () => {
+          const room = window.USJSyncState.roomId || 'USJ-1123';
+          const compressed = btoa(unescape(encodeURIComponent(JSON.stringify({
+            targetDate: state.targetDate,
+            shows: state.shows,
+          }))));
+          const baseUrl = window.location.href.split('#')[0];
+          const inviteUrl = `${baseUrl}#room=${encodeURIComponent(room)}&data=${encodeURIComponent(compressed)}`;
+
+          const ta = document.createElement('textarea');
+          ta.value = inviteUrl;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            showToast('招待リンクをコピーしました！LINEで送れます', 'success');
+          } finally {
+            ta.remove();
+          }
+        });
+      }
+
+      // 別の合言葉に参加
+      const joinRoomForm = document.getElementById('join-room-form');
+      if (joinRoomForm) {
+        joinRoomForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const input = document.getElementById('input-join-room');
+          const val = input ? input.value.trim() : '';
+          if (!val) {
+            showToast('合言葉を入力してください', 'warn');
+            return;
+          }
+          const safeRoom = val.replace(/\//g, '_').slice(0, 40);
+          window.USJSyncState.roomId = safeRoom;
+          updateUrlHash();
+          if (window.USJSync && window.USJSync.switchRoom) {
+            await window.USJSync.switchRoom(safeRoom);
+          }
+          if (input) input.value = '';
+          showToast(`合言葉「${safeRoom}」に切り替えました`, 'success');
+        });
+      }
+
+      // 演目追加ボタン
+      const addShowBtn = document.getElementById('btn-add-show');
+      if (addShowBtn) {
+        addShowBtn.addEventListener('click', () => openShowModal(null));
+      }
+
+      // 重複ジャンプ＆自動調整
+      const overlapJump = document.getElementById('overlap-banner-jump');
+      if (overlapJump) {
+        overlapJump.addEventListener('click', () => {
+          if (state.firstOverlapMin !== null) {
+            const scrollArea = document.getElementById('calendar-scroll-area');
+            const zoom = ZOOM_LEVELS[state.zoomIndex] || ZOOM_LEVELS[1];
+            const y = Math.max(0, ((state.firstOverlapMin - START_HOUR * 60) / 60) * zoom.pxPerHour - 40);
+            if (scrollArea) scrollArea.scrollTo({ top: y, behavior: 'smooth' });
+          }
+        });
+      }
+
+      const autoResolveBtn = document.getElementById('btn-auto-resolve');
+      if (autoResolveBtn) {
+        autoResolveBtn.addEventListener('click', autoResolveOverlaps);
+      }
+
+      // モバイルタブ切替
+      const tabListBtn = document.getElementById('tab-list');
+      const tabCalBtn = document.getElementById('tab-calendar');
+      if (tabListBtn) tabListBtn.addEventListener('click', () => switchMobileTab('list'));
+      if (tabCalBtn) tabCalBtn.addEventListener('click', () => switchMobileTab('calendar'));
+
+      // カテゴリ絞り込み
+      const catWrap = document.getElementById('category-filters');
+      if (catWrap) {
+        catWrap.addEventListener('click', (e) => {
+          const btn = e.target.closest('.cat-btn');
+          if (!btn) return;
+          state.categoryFilter = btn.dataset.cat || 'all';
+          catWrap.querySelectorAll('.cat-btn').forEach((b) => {
+            if (b.dataset.cat === state.categoryFilter) {
+              b.className = 'cat-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-900 text-white shadow-xs transition cursor-pointer';
+            } else {
+              b.className = 'cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer';
+            }
+          });
+          renderAll();
+        });
+      }
+
+      // 一括ON / OFF
+      const allOnBtn = document.getElementById('btn-all-on');
+      const allOffBtn = document.getElementById('btn-all-off');
+      if (allOnBtn) {
+        allOnBtn.addEventListener('click', () => {
+          state.shows.forEach((s) => {
+            if (state.categoryFilter === 'all' || s.category === state.categoryFilter) {
+              s.enabled = true;
+            }
+          });
+          saveState();
+          renderAll();
+          showToast('表示中の演目をすべて「見る」に追加しました', 'success');
+        });
+      }
+      if (allOffBtn) {
+        allOffBtn.addEventListener('click', () => {
+          state.shows.forEach((s) => {
+            if (state.categoryFilter === 'all' || s.category === state.categoryFilter) {
+              s.enabled = false;
+              s.times.forEach((t) => (t.selected = false));
+            }
+          });
+          saveState();
+          renderAll();
+          showToast('表示中の演目をすべて「見ない」にしました', 'info');
+        });
+      }
+
+      // カレンダーツールバー操作
+      const toggleLanesBtn = document.getElementById('btn-toggle-lanes');
+      if (toggleLanesBtn) {
+        toggleLanesBtn.addEventListener('click', () => {
+          state.splitLanes = !state.splitLanes;
+          saveState();
+          renderAll();
+        });
+      }
+
+      const zoomScaleBtn = document.getElementById('btn-zoom-scale');
+      if (zoomScaleBtn) {
+        zoomScaleBtn.addEventListener('click', () => {
+          state.zoomIndex = (state.zoomIndex + 1) % ZOOM_LEVELS.length;
+          saveState();
+          renderAll();
+        });
+      }
+
+      const viewAllBtn = document.getElementById('view-mode-all');
+      const viewSelBtn = document.getElementById('view-mode-selected');
+      if (viewAllBtn) {
+        viewAllBtn.addEventListener('click', () => {
+          state.viewMode = 'all';
+          renderAll();
+        });
+      }
+      if (viewSelBtn) {
+        viewSelBtn.addEventListener('click', () => {
+          state.viewMode = 'selected';
+          renderAll();
+        });
+      }
+
+      // イベント委譲（リスト＆カレンダー上のタップ操作）
+      document.addEventListener('click', (e) => {
+        const actionBtn = e.target.closest('[data-action]');
+        if (actionBtn) {
+          const action = actionBtn.dataset.action;
+          const showId = actionBtn.dataset.showId;
+          const timeId = actionBtn.dataset.timeId;
+
+          if (action === 'toggle-enabled' && showId) {
+            toggleShowEnabled(showId);
+          } else if (action === 'toggle-slot' && showId && timeId) {
+            toggleTimeSlot(showId, timeId);
+          } else if (action === 'edit-show' && showId) {
+            openShowModal(showId);
+          }
+          return;
+        }
+
+        const removeIdxBtn = e.target.closest('[data-remove-time-idx]');
+        if (removeIdxBtn) {
+          const idx = Number(removeIdxBtn.dataset.removeTimeIdx);
+          if (!isNaN(idx)) {
+            state.modalTimes.splice(idx, 1);
+            renderModalTimeChips();
+          }
+        }
+      });
+
+      // モーダル操作
+      const modalClose = document.getElementById('modal-close');
+      const modalCancel = document.getElementById('modal-cancel');
+      const modalOverlay = document.getElementById('modal-overlay');
+      if (modalClose) modalClose.addEventListener('click', closeShowModal);
+      if (modalCancel) modalCancel.addEventListener('click', closeShowModal);
+      if (modalOverlay) {
+        modalOverlay.addEventListener('click', (e) => {
+          if (e.target === modalOverlay) closeShowModal();
+        });
+      }
+
+      const addTimeChipBtn = document.getElementById('btn-add-time-chip');
+      if (addTimeChipBtn) {
+        addTimeChipBtn.addEventListener('click', () => {
+          const timeInput = document.getElementById('input-new-time');
+          const val = timeInput ? timeInput.value : '';
+          if (!val) return;
+          if (state.modalTimes.some((t) => t.time === val)) {
+            showToast('同じ時刻がすでに登録されています', 'warn');
+            return;
+          }
+          state.modalTimes.push({
+            id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            time: val,
+            selected: false,
+          });
+          renderModalTimeChips();
+        });
+      }
+
+      const showForm = document.getElementById('show-form');
+      if (showForm) {
+        showForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const editId = document.getElementById('edit-show-id').value;
+          const title = document.getElementById('input-title').value.trim();
+          const area = document.getElementById('input-area').value.trim() || 'パーク内';
+          const duration = Math.max(5, Math.min(180, Number(document.getElementById('input-duration').value) || 25));
+          const category = document.getElementById('input-category').value || 'show';
+          const color = document.getElementById('input-color').value || 'blue';
+
+          if (!title) return;
+
+          if (editId) {
+            const target = state.shows.find((s) => s.id === editId);
+            if (target) {
+              target.title = title;
+              target.area = area;
+              target.duration = duration;
+              target.category = category;
+              target.color = color;
+              target.times = state.modalTimes.map((t) => ({ ...t }));
+            }
+            showToast('演目情報を更新しました', 'success');
+          } else {
+            state.shows.unshift({
+              id: `show-custom-${Date.now()}`,
+              title,
+              area,
+              duration,
+              category,
+              color,
+              enabled: true,
+              times: state.modalTimes.map((t) => ({ ...t })),
+            });
+            showToast('新しい演目を追加しました', 'success');
+          }
+
+          saveState();
+          renderAll();
+          closeShowModal();
+        });
+      }
+
+      const deleteShowBtn = document.getElementById('btn-delete-show');
+      if (deleteShowBtn) {
+        deleteShowBtn.addEventListener('click', () => {
+          const editId = document.getElementById('edit-show-id').value;
+          if (!editId) return;
+          state.shows = state.shows.filter((s) => s.id !== editId);
+          saveState();
+          renderAll();
+          closeShowModal();
+          showToast('演目を削除しました', 'info');
+        });
+      }
+
+      // 画面リサイズ時にカレンダー幅を再計算
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 1024) {
+          const listPanel = document.getElementById('panel-list');
+          const calPanel = document.getElementById('panel-calendar');
+          if (listPanel) {
+            listPanel.classList.remove('hidden');
+            listPanel.classList.add('flex');
+          }
+          if (calPanel) {
+            calPanel.classList.remove('hidden');
+            calPanel.classList.add('flex');
+          }
+        } else {
+          switchMobileTab(state.mobileTab);
+        }
+        renderCalendar();
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
