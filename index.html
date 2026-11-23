@@ -428,9 +428,9 @@
 
         <!-- 独自ドメイン公開時のメモ -->
         <details class="bg-slate-100 rounded-xl p-3 text-[11px] text-slate-600">
-          <summary class="font-bold text-slate-800 cursor-pointer">🌐 独自ドメイン（Cloudflare Pages等）に置く場合</summary>
+          <summary class="font-bold text-slate-800 cursor-pointer">🌐 リアルタイム同期の接続先</summary>
           <p class="mt-1.5 leading-relaxed">
-            HTMLファイル1枚をそのままアップロードして公開できます。独自ドメイン上でもリアルタイム同期を使う場合は、HTML内の <code class="bg-white px-1 rounded">CUSTOM_FIREBASE_CONFIG</code> に無料のFirebase設定値を貼り付けてください（未設定でも「招待リンクをコピー」でON/OFF状態の共有はそのまま使えます）。
+            Firebase（<code class="bg-white px-1 rounded">usj-sync</code>）と接続済みです。GitHub Pagesや独自ドメインのどこから開いても、同じ「合言葉」を入力した端末同士でリアルタイムに同期されます。
           </p>
         </details>
       </div>
@@ -446,20 +446,18 @@
     import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // 独自ドメインで運用する際にリアルタイム同期を有効化したい場合はここにFirebase設定を記入
-    const CUSTOM_FIREBASE_CONFIG = null;
+    // Firebaseプロジェクト（usj-sync）の接続設定
+    const CUSTOM_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyCZn6ea9dVbWvqgsGPoUKS1eyoKtl0DfrM",
+      authDomain: "usj-sync.firebaseapp.com",
+      projectId: "usj-sync",
+      storageBucket: "usj-sync.firebasestorage.app",
+      messagingSenderId: "986233117066",
+      appId: "1:986233117066:web:76dad4f902f65278e81073"
+    };
 
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    let firebaseConfig = null;
-    try {
-      if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-        firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-      } else if (CUSTOM_FIREBASE_CONFIG) {
-        firebaseConfig = CUSTOM_FIREBASE_CONFIG;
-      }
-    } catch (e) {
-      console.warn('Firebase config parse error:', e);
-    }
+    const appId = 'usj-sync-app';
+    const firebaseConfig = CUSTOM_FIREBASE_CONFIG;
 
     let db = null;
     let auth = null;
