@@ -123,10 +123,10 @@
             <span id="sync-btn-label">接続中</span>
           </button>
 
-          <!-- 何回目（決定した公演数）バッジ -->
-          <span id="header-run-count-badge" title="決定した公演の回数"
+          <!-- 決定済み合計公演数バッジ -->
+          <span id="header-run-count-badge" title="決定している合計公演数"
             class="inline-flex items-center justify-center min-w-[26px] h-[24px] px-1.5 rounded-full bg-amber-300 text-slate-950 text-[10px] sm:text-[11px] font-extrabold shadow-sm border border-amber-400 shrink-0">
-            0回目
+            0回
           </span>
 
           <button id="btn-reset-default" type="button" title="初期データに戻す"
@@ -1316,13 +1316,15 @@
       function createShowCardElement(show, isOn, selectedItems, conflictKeys) {
         const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
         const icon = CATEGORY_ICONS[show.category] || '🎪';
+        // このショーを何回見る予定か（選択中の公演数）
+        const watchCount = isOn ? show.selectedTimes.length : 0;
 
         const card = document.createElement('div');
         card.className = isOn
           ? 'bg-white rounded-xl p-2.5 border border-emerald-200/90 shadow-sm flex flex-col gap-1.5 transition hover:border-emerald-400'
           : 'bg-white/90 rounded-xl p-2.5 border border-slate-200 shadow-sm flex flex-col gap-1.5 transition hover:border-slate-300';
 
-        // 上段：所要時間＋演目ごとの選択回数バッジ ＆ ON/OFF切替＋編集
+        // 上段：所要時間＋「このショーを何回見るか」バッジ ＆ ON/OFF切替
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-1';
 
@@ -1334,14 +1336,12 @@
         durSpan.textContent = `約${show.duration}分`;
         metaLeft.appendChild(durSpan);
 
-        if (isOn && show.selectedTimes.length > 0) {
-          const selectedRunNums = show.selectedTimes
-            .map((t) => show.times.indexOf(t) + 1)
-            .filter((n) => n > 0);
-          const runBadge = document.createElement('span');
-          runBadge.className = 'px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold shrink-0';
-          runBadge.textContent = selectedRunNums.map((n) => `${n}回目`).join('・');
-          metaLeft.appendChild(runBadge);
+        if (watchCount > 0) {
+          const watchBadge = document.createElement('span');
+          watchBadge.title = `このショーを${watchCount}回見る予定`;
+          watchBadge.className = 'px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold shrink-0 leading-none';
+          watchBadge.textContent = `${watchCount}回見る`;
+          metaLeft.appendChild(watchBadge);
         }
 
         const toggleBtn = document.createElement('button');
@@ -1630,6 +1630,8 @@
           const icon = CATEGORY_ICONS[show.category] || '🎪';
           const isConflict = isSelected && conflictKeys.has(key);
           const candOverlap = isOnLane && !isSelected && doesCandidateOverlapSelected(show.id, startMin, endMin, selectedItems);
+          // このショーを何回見る予定か
+          const showWatchCount = show.enabled ? show.selectedTimes.length : 0;
 
           const topPx = Math.max(0, (startMin - CALENDAR_START_MIN) * pxPerMin) + 1;
           const heightPx = Math.max(26, (endMin - startMin) * pxPerMin - 2);
@@ -1662,29 +1664,31 @@
 
           const timeLabel = document.createElement('span');
           timeLabel.className = 'text-[10px] font-extrabold tracking-tight truncate';
-          timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)} ${runNumber}回目` : `${time} ${runNumber}回目`;
+          timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)}` : time;
           headerLine.appendChild(timeLabel);
 
           if (isOnLane && _totalCols <= 3) {
             const rightBadges = document.createElement('div');
             rightBadges.className = 'flex items-center gap-0.5 shrink-0';
 
-            const runPill = document.createElement('span');
-            runPill.className = isSelected || isConflict
-              ? 'px-1 py-0.2 rounded bg-black/20 text-[9px] font-extrabold'
-              : 'px-1 py-0.2 rounded bg-slate-900/10 text-slate-800 text-[9px] font-extrabold';
-            runPill.textContent = `${runNumber}回目`;
-            rightBadges.appendChild(runPill);
+            if (showWatchCount > 0) {
+              const watchPill = document.createElement('span');
+              watchPill.className = isSelected || isConflict
+                ? 'px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold'
+                : 'px-1 py-0.5 rounded bg-amber-200/90 text-amber-950 text-[9px] font-extrabold';
+              watchPill.textContent = `${showWatchCount}回見る`;
+              rightBadges.appendChild(watchPill);
+            }
 
             const statusBadge = document.createElement('span');
             if (isConflict) {
-              statusBadge.className = 'px-1 py-0.2 rounded bg-white text-red-700 text-[9px] font-extrabold';
+              statusBadge.className = 'px-1 py-0.5 rounded bg-white text-red-700 text-[9px] font-extrabold';
               statusBadge.textContent = '重複';
             } else if (isSelected) {
-              statusBadge.className = 'px-1 py-0.2 rounded bg-black/20 text-[9px] font-extrabold';
+              statusBadge.className = 'px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold';
               statusBadge.textContent = '✓決定';
             } else {
-              statusBadge.className = 'px-1 py-0.2 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold';
+              statusBadge.className = 'px-1 py-0.5 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold';
               statusBadge.textContent = candOverlap ? '被り' : '候補';
             }
             rightBadges.appendChild(statusBadge);
