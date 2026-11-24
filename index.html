@@ -123,6 +123,12 @@
             <span id="sync-btn-label">接続中</span>
           </button>
 
+          <!-- 何回目（決定した公演数）バッジ -->
+          <span id="header-run-count-badge" title="決定した公演の回数"
+            class="inline-flex items-center justify-center min-w-[26px] h-[24px] px-1.5 rounded-full bg-amber-300 text-slate-950 text-[10px] sm:text-[11px] font-extrabold shadow-sm border border-amber-400 shrink-0">
+            0回目
+          </span>
+
           <button id="btn-reset-default" type="button" title="初期データに戻す"
             class="px-1.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-sky-200 hover:text-white text-[11px] border border-white/15 transition cursor-pointer">
             ↺
@@ -986,6 +992,8 @@
         state.shows.forEach((show) => {
           if (!show.enabled) return;
           show.selectedTimes.forEach((timeStr) => {
+            const slotIdx = show.times.indexOf(timeStr);
+            const runNumber = slotIdx >= 0 ? slotIdx + 1 : 1;
             const startMin = timeToMin(timeStr);
             const endMin = startMin + show.duration;
             selectedItems.push({
@@ -995,6 +1003,7 @@
               area: show.area,
               category: show.category,
               time: timeStr,
+              runNumber,
               startMin,
               endMin
             });
@@ -1171,7 +1180,7 @@
           lines.push('【✅ 決定した公演スケジュール】');
           selectedItems.forEach((item) => {
             const icon = CATEGORY_ICONS[item.category] || '🎪';
-            lines.push(`${item.time}～${minToTime(item.endMin)} ${icon}${item.title}（📍${item.area}）`);
+            lines.push(`${item.time}～${minToTime(item.endMin)}（${item.runNumber}回目）${icon}${item.title}（📍${item.area}）`);
           });
         } else {
           lines.push('【✅ 決定した公演】まだ時間が選択されていません');
@@ -1215,6 +1224,11 @@
 
         const { selectedItems, conflictKeys, conflictPairs } = getSelectedSlotsWithConflicts();
         const enabledCount = state.shows.filter((s) => s.enabled).length;
+
+        const runCountBadge = document.getElementById('header-run-count-badge');
+        if (runCountBadge) {
+          runCountBadge.textContent = `${selectedItems.length}回目`;
+        }
 
         document.getElementById('summary-show-count').textContent = `${enabledCount}演目`;
         document.getElementById('summary-slot-count').textContent = `${selectedItems.length}公演`;
@@ -1308,23 +1322,37 @@
           ? 'bg-white rounded-xl p-2.5 border border-emerald-200/90 shadow-sm flex flex-col gap-1.5 transition hover:border-emerald-400'
           : 'bg-white/90 rounded-xl p-2.5 border border-slate-200 shadow-sm flex flex-col gap-1.5 transition hover:border-slate-300';
 
-        // 上段：所要時間 ＆ ON/OFF切替＋編集
+        // 上段：所要時間＋演目ごとの選択回数バッジ ＆ ON/OFF切替＋編集
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-1';
 
+        const metaLeft = document.createElement('div');
+        metaLeft.className = 'flex items-center gap-1.5 min-w-0';
+
         const durSpan = document.createElement('span');
-        durSpan.className = 'text-[10px] font-bold text-slate-500';
+        durSpan.className = 'text-[10px] font-bold text-slate-500 shrink-0';
         durSpan.textContent = `約${show.duration}分`;
+        metaLeft.appendChild(durSpan);
+
+        if (isOn && show.selectedTimes.length > 0) {
+          const selectedRunNums = show.selectedTimes
+            .map((t) => show.times.indexOf(t) + 1)
+            .filter((n) => n > 0);
+          const runBadge = document.createElement('span');
+          runBadge.className = 'px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-extrabold shrink-0';
+          runBadge.textContent = selectedRunNums.map((n) => `${n}回目`).join('・');
+          metaLeft.appendChild(runBadge);
+        }
 
         const toggleBtn = document.createElement('button');
         toggleBtn.type = 'button';
         toggleBtn.className = isOn
-          ? 'px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-extrabold border border-slate-200 transition cursor-pointer'
-          : 'px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold shadow-sm transition cursor-pointer';
+          ? 'px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-extrabold border border-slate-200 transition cursor-pointer shrink-0'
+          : 'px-2 py-0.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-extrabold shadow-sm transition cursor-pointer shrink-0';
         toggleBtn.textContent = isOn ? '見ない →' : '← 見る';
         toggleBtn.addEventListener('click', () => toggleShowEnabled(show.id));
 
-        topRow.appendChild(durSpan);
+        topRow.appendChild(metaLeft);
         topRow.appendChild(toggleBtn);
 
         // 中段：タイトル ＆ 時間編集ボタン
@@ -1349,7 +1377,7 @@
         areaDiv.className = 'text-[10px] text-slate-500 truncate';
         areaDiv.textContent = `📍 ${show.area}`;
 
-        // 時刻チップ群
+        // 時刻チップ群（各チップに「1回目・2回目…」の回数を表示）
         const chipsWrap = document.createElement('div');
         chipsWrap.className = 'flex flex-wrap gap-1 pt-0.5';
 
@@ -1359,37 +1387,44 @@
           emptySpan.textContent = '公演時刻なし';
           chipsWrap.appendChild(emptySpan);
         } else {
-          show.times.forEach((t) => {
+          show.times.forEach((t, slotIdx) => {
             const isSelected = isOn && show.selectedTimes.includes(t);
             const key = show.id + '@' + t;
             const isConflict = isSelected && conflictKeys.has(key);
             const startMin = timeToMin(t);
             const endMin = startMin + show.duration;
             const candOverlap = !isSelected && doesCandidateOverlapSelected(show.id, startMin, endMin, selectedItems);
+            const runLabel = `${slotIdx + 1}回目`;
 
             const chip = document.createElement('button');
             chip.type = 'button';
-            chip.title = isOn ? 'タップで鑑賞回を決定／解除' : 'タップで「見る」に追加してこの回を選択';
+            chip.title = isOn ? `${runLabel}（${t}）：タップで鑑賞回を決定／解除` : `${runLabel}（${t}）：タップで「見る」に追加してこの回を選択`;
 
-            let cls = 'px-2 py-0.5 rounded-md text-[11px] font-extrabold border transition cursor-pointer ';
+            let cls = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-extrabold border transition cursor-pointer ';
             if (isConflict) {
               cls += 'bg-red-600 text-white border-red-800 ring-2 ring-red-300';
-              chip.textContent = `⚠️ ${t}`;
             } else if (isSelected) {
               cls += theme.chipSelected;
-              chip.textContent = `✓ ${t}`;
             } else if (!isOn) {
               cls += 'bg-slate-50 hover:bg-emerald-50 text-slate-700 border-slate-200';
-              chip.textContent = t;
             } else if (candOverlap) {
               cls += 'bg-slate-100 text-slate-400 border-slate-200 line-through decoration-slate-400';
-              chip.textContent = t;
             } else {
               cls += theme.chipIdle;
-              chip.textContent = t;
             }
 
+            const runTag = document.createElement('span');
+            runTag.className = isSelected || isConflict
+              ? 'px-1 py-0.2 rounded bg-black/15 text-[9px] font-extrabold leading-none'
+              : 'px-1 py-0.2 rounded bg-slate-900/10 text-[9px] font-extrabold leading-none opacity-80';
+            runTag.textContent = runLabel;
+
+            const timeSpan = document.createElement('span');
+            timeSpan.textContent = isConflict ? `⚠️ ${t}` : isSelected ? `✓ ${t}` : t;
+
             chip.className = cls;
+            chip.appendChild(runTag);
+            chip.appendChild(timeSpan);
             chip.addEventListener('click', () => toggleTimeSlot(show.id, t));
             chipsWrap.appendChild(chip);
           });
@@ -1538,7 +1573,7 @@
         state.shows.forEach((show) => {
           if (state.activeCategory !== 'all' && show.category !== state.activeCategory) return;
 
-          show.times.forEach((t) => {
+          show.times.forEach((t, idx) => {
             const startMin = timeToMin(t);
             const endMin = startMin + show.duration;
             if (endMin < CALENDAR_START_MIN || startMin > CALENDAR_END_MIN) return;
@@ -1549,6 +1584,7 @@
             const evObj = {
               show,
               time: t,
+              runNumber: idx + 1,
               startMin,
               endMin,
               isSelected,
@@ -1589,7 +1625,7 @@
 
       function renderLaneBlocks(container, layoutEvents, isOnLane, pxPerMin, selectedItems, conflictKeys) {
         layoutEvents.forEach((ev) => {
-          const { show, time, startMin, endMin, isSelected, key, _col, _totalCols } = ev;
+          const { show, time, runNumber, startMin, endMin, isSelected, key, _col, _totalCols } = ev;
           const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
           const icon = CATEGORY_ICONS[show.category] || '🎪';
           const isConflict = isSelected && conflictKeys.has(key);
@@ -1626,22 +1662,33 @@
 
           const timeLabel = document.createElement('span');
           timeLabel.className = 'text-[10px] font-extrabold tracking-tight truncate';
-          timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)}` : time;
+          timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)} ${runNumber}回目` : `${time} ${runNumber}回目`;
           headerLine.appendChild(timeLabel);
 
           if (isOnLane && _totalCols <= 3) {
-            const badge = document.createElement('span');
+            const rightBadges = document.createElement('div');
+            rightBadges.className = 'flex items-center gap-0.5 shrink-0';
+
+            const runPill = document.createElement('span');
+            runPill.className = isSelected || isConflict
+              ? 'px-1 py-0.2 rounded bg-black/20 text-[9px] font-extrabold'
+              : 'px-1 py-0.2 rounded bg-slate-900/10 text-slate-800 text-[9px] font-extrabold';
+            runPill.textContent = `${runNumber}回目`;
+            rightBadges.appendChild(runPill);
+
+            const statusBadge = document.createElement('span');
             if (isConflict) {
-              badge.className = 'px-1 py-0.2 rounded bg-white text-red-700 text-[9px] font-extrabold shrink-0';
-              badge.textContent = '重複';
+              statusBadge.className = 'px-1 py-0.2 rounded bg-white text-red-700 text-[9px] font-extrabold';
+              statusBadge.textContent = '重複';
             } else if (isSelected) {
-              badge.className = 'px-1 py-0.2 rounded bg-black/20 text-[9px] font-extrabold shrink-0';
-              badge.textContent = '✓決定';
+              statusBadge.className = 'px-1 py-0.2 rounded bg-black/20 text-[9px] font-extrabold';
+              statusBadge.textContent = '✓決定';
             } else {
-              badge.className = 'px-1 py-0.2 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold shrink-0';
-              badge.textContent = candOverlap ? '被り' : '候補';
+              statusBadge.className = 'px-1 py-0.2 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold';
+              statusBadge.textContent = candOverlap ? '被り' : '候補';
             }
-            headerLine.appendChild(badge);
+            rightBadges.appendChild(statusBadge);
+            headerLine.appendChild(rightBadges);
           }
 
           const titleDiv = document.createElement('div');
@@ -1673,10 +1720,10 @@
           wrap.innerHTML = '<span class="text-xs text-slate-400">時刻を追加してください</span>';
           return;
         }
-        state.modalTempTimes.forEach((t) => {
+        state.modalTempTimes.forEach((t, idx) => {
           const pill = document.createElement('span');
           pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-300 text-xs font-extrabold text-slate-800';
-          pill.innerHTML = `<span>${t}</span>`;
+          pill.innerHTML = `<span>${idx + 1}回目 ${t}</span>`;
           const del = document.createElement('button');
           del.type = 'button';
           del.className = 'text-slate-400 hover:text-red-600 font-bold ml-0.5 cursor-pointer';
