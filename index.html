@@ -97,13 +97,8 @@
         <!-- 日付選択＆コンパクトアクション群 -->
         <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <div class="flex items-center bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 gap-1">
-            <input id="schedule-date" type="date" value="2026-11-23"
-              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[98px] sm:w-auto" />
-            <button id="btn-fetch-schedule" type="button"
-              class="px-1.5 py-0.5 rounded bg-sky-400 hover:bg-sky-300 active:scale-95 text-slate-950 text-[10px] sm:text-xs font-extrabold transition flex items-center gap-0.5 cursor-pointer">
-              <span id="fetch-icon">🔄</span>
-              <span>更新</span>
-            </button>
+            <input id="schedule-date" type="date" value="2026-11-23" title="対象日を選択"
+              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[108px] sm:w-auto" />
           </div>
 
           <button id="btn-add-show" type="button" title="演目・予定を追加"
@@ -2263,7 +2258,7 @@
           }
         });
 
-        if (!safeReplaceUnlisted) {
+        if (!replaceUnlisted) {
           state.shows.forEach((s) => {
             if (!matchedExistingIds.has(s.id)) {
               nextShows.push(s);
@@ -2290,7 +2285,7 @@
 
       // === イベントリスナー登録 ===
       function bindEvents() {
-        document.getElementById('btn-fetch-schedule').addEventListener('click', updateScheduleByDate);
+        document.getElementById('schedule-date').addEventListener('change', updateScheduleByDate);
         document.getElementById('btn-add-show').addEventListener('click', () => openEditModal(null));
         document.getElementById('btn-import-schedule').addEventListener('click', openImportModal);
         document.getElementById('btn-copy-plan').addEventListener('click', copyPlanText);
