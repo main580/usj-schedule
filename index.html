@@ -1938,17 +1938,97 @@
       // === 貼り付けテキストの解析・取り込み ===
       function normalizeCompareTitle(title) {
         return String(title || '')
-          .replace(/[～〜~・･\s]+/g, '')
-          .replace(/[！!？?]+$/g, '')
-          .toLowerCase();
+          .replace(/[（\(][^）\)]*[）\)]/g, '')
+          .replace(/[～〜~・･＆&＋+\s!！?？。、,．.]+/g, '')
+          .toLowerCase()
+          .trim();
+      }
+
+      // 同一演目の重複カードを1つに統合（ON/OFF・選択済み時刻・公演時刻をマージ）
+      function deduplicateShows(showList) {
+        if (!Array.isArray(showList)) return [];
+        const mergedByKey = new Map();
+        const orderKeys = [];
+
+        showList.forEach((raw, idx) => {
+          const title = String(raw.title || '無題の演目').trim();
+          const key = normalizeCompareTitle(title) || ('__idx_' + idx);
+          const times = Array.isArray(raw.times) ? Array.from(new Set(raw.times.filter(Boolean))).sort() : [];
+          const selectedTimes = Array.isArray(raw.selectedTimes)
+            ? Array.from(new Set(raw.selectedTimes.filter((t) => times.includes(t)))).sort()
+            : [];
+
+          if (!mergedByKey.has(key)) {
+            mergedByKey.set(key, {
+              id: raw.id || ('show-' + idx + '-' + Date.now()),
+              title,
+              category: CATEGORY_ICONS[raw.category] ? raw.category : 'show',
+              duration: Math.max(5, Math.min(180, parseInt(raw.duration, 10) || 25)),
+              area: String(raw.area || 'パーク内'),
+              color: COLOR_THEMES[raw.color] ? raw.color : 'blue',
+              enabled: Boolean(raw.enabled),
+              times,
+              selectedTimes
+            });
+            orderKeys.push(key);
+          } else {
+            const existing = mergedByKey.get(key);
+            existing.enabled = existing.enabled || Boolean(raw.enabled);
+            if ((!existing.area || existing.area === 'パーク内') && raw.area && raw.area !== 'パーク内') {
+              existing.area = String(raw.area);
+            }
+            if (title.length > existing.title.length) {
+              existing.title = title;
+            }
+            existing.times = Array.from(new Set([...existing.times, ...times])).sort();
+            existing.selectedTimes = Array.from(
+              new Set([...existing.selectedTimes, ...selectedTimes].filter((t) => existing.times.includes(t)))
+            ).sort();
+          }
+        });
+
+        return orderKeys.map((k) => mergedByKey.get(k));
+      }
+
+      function normalizeShows(rawShows) {
+        if (!Array.isArray(rawShows)) return deduplicateShows(createDefaultShows('2026-11-25'));
+        return deduplicateShows(rawShows);
+      }
+      // 日付更新（現在の見る/見ないON/OFFと、一致する選択済み時刻を保護して更新）
+      function updateScheduleByDate() {
+        const dateInput = document.getElementById('schedule-date');
+        const newDate = (dateInput && dateInput.value) ? dateInput.value : '2026-11-25';
+        const currentDeduped = deduplicateShows(state.shows);
+        const freshDefaults = createDefaultShows(newDate);
+        const oldMap = new Map(currentDeduped.map((s) => [normalizeCompareTitle(s.title), s]));
+
+        const merged = freshDefaults.map((fresh) => {
+          const normKey = normalizeCompareTitle(fresh.title);
+          const prev = oldMap.get(normKey);
+          if (!prev) return fresh;
+          const preservedSelected = prev.selectedTimes.filter((t) => fresh.times.includes(t));
+          oldMap.delete(normKey);
+          return {
+            ...fresh,
+            enabled: prev.enabled,
+            selectedTimes: preservedSelected
+          };
+        });
+
+        // ユーザーが手動追加したカスタム演目もそのまま残す
+        oldMap.forEach((customShow) => {
+          merged.push(customShow);
+        });
+
+        state.date = newDate;
+        state.shows = deduplicateShows(merged);
+        commitUserChange(`📅 ${formatDisplayDate(newDate)} の公演スケジュールを反映しました（重複整理・ON/OFF維持）`);
       }
 
       function inferCategoryFromTitle(title) {
         const t = String(title || '');
         if (t.includes('パレード')) return 'parade';
-        if (t.includes('グリーティング') || t.includes('ミート') || t.includes('エンカウンター') || t.includes('レッスン')) {
-          return 'greeting';
-        }
+        if (t.includes('グリーティング') || t.includes('ミート') || t.includes('レッスン')) return 'greeting';
         return 'show';
       }
 
