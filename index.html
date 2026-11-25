@@ -152,11 +152,14 @@
           <span class="bg-white/10 px-1.5 py-0.5 rounded text-sky-100">
             <strong id="summary-show-count" class="text-white">0演目</strong>/<strong id="summary-slot-count" class="text-amber-300">0公演</strong>
           </span>
+          <span id="summary-park-hours" class="bg-sky-400/20 border border-sky-300/35 px-1.5 py-0.5 rounded text-sky-100 font-bold">
+            パーク <span id="park-hours-text">09:00〜21:00</span>
+          </span>
           <span id="summary-time-range" class="hidden bg-white/10 px-1.5 py-0.5 rounded text-sky-100 font-semibold">
             🕒 <span id="summary-time-text">--:-- ～ --:--</span>
           </span>
           <span id="schedule-source-text" class="hidden md:inline text-sky-200/80 text-[11px]">
-            2026/11/23 公演スケジュール反映済
+            2026/11/25 公演スケジュール反映済
           </span>
         </div>
 
@@ -481,12 +484,20 @@
 
         <div class="flex items-center justify-between gap-2 text-xs">
           <label class="inline-flex items-center gap-1.5 font-bold text-slate-700 cursor-pointer">
-            <input id="input-import-replace-all" type="checkbox" checked class="rounded border-slate-300 text-sky-700 focus:ring-sky-600" />
+            <input id="input-import-replace-all" type="checkbox" class="rounded border-slate-300 text-sky-700 focus:ring-sky-600" />
             <span>取り込みにない既存演目はリストから外す</span>
           </label>
-          <button id="btn-import-sample" type="button" class="text-[11px] font-bold text-sky-700 hover:underline cursor-pointer shrink-0">
-            サンプル挿入
-          </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <button id="btn-import-official-preset" type="button" class="text-[11px] font-extrabold text-emerald-700 hover:underline cursor-pointer">
+              公式全文を挿入
+            </button>
+            <button id="btn-import-sample" type="button" class="text-[11px] font-bold text-sky-700 hover:underline cursor-pointer">
+              サンプル挿入
+            </button>
+            <button id="btn-import-usj-1125" type="button" class="text-[11px] font-bold text-indigo-700 hover:underline cursor-pointer">
+              11/25整形済みを挿入
+            </button>
+          </div>
         </div>
 
         <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -509,8 +520,8 @@
       const STORAGE_ROOM_PREFIX = 'usj_planner_room_v3_';
       const STORAGE_PREFS_KEY = 'usj_planner_prefs_v3';
       const DEFAULT_ROOM_ID = 'USJ-1123';
-      const CALENDAR_START_MIN = 8 * 60 + 30; // 08:30
-      const CALENDAR_END_MIN = 20 * 60 + 45;  // 20:45
+      const DEFAULT_OPEN_TIME = '09:00';
+      const DEFAULT_CLOSE_TIME = '21:00';
 
       const ZOOM_PRESETS = [
         { label: '広め', pxPerMin: 2.9 },
@@ -569,32 +580,25 @@
         greeting: '💛'
       };
 
-      // 2026/11/23 基準の初期演目データ（見るON 6件 ／ 見ないOFF 12件）
+      // デフォルトで「見る（ON）」に入れる演目キーワード
+      const DEFAULT_WATCH_KEYWORDS = [
+        'パレード',
+        'クロミ・ライブ',
+        'アルティメット・ブルース・バッシュ',
+        'パワー・オブ・ロック',
+        'ウォーターワールド',
+        'ユニバーサル・モンスター・ライブ・ロックンロール・ショー'
+      ];
+
+      function shouldDefaultWatch(title) {
+        const t = String(title || '');
+        return DEFAULT_WATCH_KEYWORDS.some((kw) => t.includes(kw));
+      }
+
+      // 現行スケジュール基準の初期演目データ（指定6演目をデフォルト「見る（ON）」に設定）
       function createDefaultShows(dateStr) {
         const base = [
           // === 見る（ON）初期6演目 ===
-          {
-            id: 'power-of-rock',
-            title: 'パワー・オブ・ロック ～ホリデー・ロッキン！～',
-            category: 'show',
-            duration: 25,
-            area: 'ニューヨーク・エリア',
-            color: 'rose',
-            enabled: true,
-            times: ['09:25', '10:55', '12:35', '15:05', '16:45', '18:25'],
-            selectedTimes: []
-          },
-          {
-            id: 'kuromi-live',
-            title: 'クロミ・ライブ ～Discover Me Discover U!!!～',
-            category: 'show',
-            duration: 25,
-            area: 'ニューヨーク・エリア',
-            color: 'purple',
-            enabled: true,
-            times: ['09:50', '11:25', '13:00', '15:15', '16:50'],
-            selectedTimes: []
-          },
           {
             id: 'no-limit-parade',
             title: 'NO LIMIT! パレード ～Discover U!!! バージョン～',
@@ -607,6 +611,39 @@
             selectedTimes: []
           },
           {
+            id: 'kuromi-live',
+            title: 'クロミ・ライブ ～ Discover Me Discover U!!! ～',
+            category: 'show',
+            duration: 25,
+            area: 'ニューヨーク・エリア',
+            color: 'purple',
+            enabled: true,
+            times: ['09:50', '11:25', '13:00'],
+            selectedTimes: []
+          },
+          {
+            id: 'ultimate-blues-bash',
+            title: 'アルティメット・ブルース・バッシュ ～音楽の色～',
+            category: 'show',
+            duration: 25,
+            area: 'ハリウッド・エリア',
+            color: 'blue',
+            enabled: true,
+            times: ['15:10', '16:45', '18:25', '20:25'],
+            selectedTimes: []
+          },
+          {
+            id: 'power-of-rock',
+            title: 'パワー・オブ・ロック ～ホリデー・ロッキン！～',
+            category: 'show',
+            duration: 25,
+            area: 'ニューヨーク・エリア',
+            color: 'rose',
+            enabled: true,
+            times: ['10:55', '12:35', '15:05', '16:45', '18:25'],
+            selectedTimes: []
+          },
+          {
             id: 'waterworld',
             title: 'ウォーターワールド',
             category: 'show',
@@ -614,7 +651,7 @@
             area: 'ウォーターワールド',
             color: 'cyan',
             enabled: true,
-            times: ['12:15', '14:30', '15:45'],
+            times: ['12:15', '14:30', '16:45'],
             selectedTimes: []
           },
           {
@@ -625,22 +662,11 @@
             area: 'ハリウッド・エリア',
             color: 'purple',
             enabled: true,
-            times: ['11:15', '12:45', '14:15', '16:00', '17:30'],
-            selectedTimes: []
-          },
-          {
-            id: 'frosty-snow-party',
-            title: 'フロスティーズ・エレクトリック・スノー・パーティ',
-            category: 'show',
-            duration: 25,
-            area: 'グラマシーパーク',
-            color: 'blue',
-            enabled: true,
-            times: ['17:30', '19:00', '20:15'],
+            times: ['11:15', '13:00', '14:45', '16:30', '18:15', '20:00'],
             selectedTimes: []
           },
 
-          // === 見ない（OFF）初期12演目 ===
+          // === 見ない（OFF）初期演目 ===
           {
             id: 'wicked-oz',
             title: 'ウィキッド ～オズの魔女たち～',
@@ -653,58 +679,14 @@
             selectedTimes: []
           },
           {
-            id: 'discover-u-time',
-            title: 'Discover U!!! タイム',
+            id: 'wonderland-lets-smile',
+            title: 'ユニバーサル・ワンダーランド ～レッツ・スマイル・トゥギャザー！〜',
             category: 'show',
             duration: 20,
-            area: 'グラマシーパーク',
-            color: 'amber',
+            area: 'ユニバーサル・ワンダーランド',
+            color: 'rose',
             enabled: false,
-            times: ['12:00', '15:30'],
-            selectedTimes: []
-          },
-          {
-            id: 'holiday-frog-choir',
-            title: 'ホリデー・フロッグ・クワイア',
-            category: 'show',
-            duration: 20,
-            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
-            color: 'emerald',
-            enabled: false,
-            times: ['10:05', '11:05', '12:05', '14:35', '16:05'],
-            selectedTimes: []
-          },
-          {
-            id: 'triwizard-rally',
-            title: 'トライウィザード・スピリット・ラリー',
-            category: 'show',
-            duration: 20,
-            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
-            color: 'blue',
-            enabled: false,
-            times: ['11:35', '12:35', '13:35', '15:35', '16:35'],
-            selectedTimes: []
-          },
-          {
-            id: 'hippogriff-lesson',
-            title: 'ヒッポグリフ・マジカル・レッスン',
-            category: 'greeting',
-            duration: 20,
-            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
-            color: 'cyan',
-            enabled: false,
-            times: ['09:35', '10:35', '12:55', '14:05', '15:05'],
-            selectedTimes: []
-          },
-          {
-            id: 'minion-christmas-greeting',
-            title: 'ミニオン・クリスマス・グリーティング',
-            category: 'greeting',
-            duration: 20,
-            area: 'ミニオン・パーク',
-            color: 'amber',
-            enabled: false,
-            times: ['09:45', '11:05', '13:20', '14:50', '16:15'],
+            times: ['09:45', '11:05', '12:25', '14:55', '16:15'],
             selectedTimes: []
           },
           {
@@ -715,79 +697,143 @@
             area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
             color: 'emerald',
             enabled: false,
-            times: ['09:45', '10:45', '11:30', '13:45', '15:15'],
+            times: ['10:30', '11:30', '12:30', '14:45', '15:45'],
             selectedTimes: []
           },
           {
-            id: 'wonderland-feel-rhythm',
-            title: 'ユニバーサル・ワンダーランド・フィール・ザ・リズム',
+            id: 'hippogriff-lesson',
+            title: 'ヒッポグリフ・マジカル・レッスン',
+            category: 'greeting',
+            duration: 20,
+            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+            color: 'cyan',
+            enabled: false,
+            times: ['09:30', '10:20', '11:20', '12:20', '13:20', '14:10', '15:05', '16:05'],
+            selectedTimes: []
+          },
+          {
+            id: 'discover-u-time',
+            title: 'Discover U!!! タイム',
             category: 'show',
             duration: 20,
-            area: 'ユニバーサル・ワンダーランド',
-            color: 'rose',
+            area: 'グラマシーパーク',
+            color: 'amber',
             enabled: false,
-            times: ['09:45', '11:05', '13:15', '15:00', '16:20'],
+            times: ['12:00'],
             selectedTimes: []
           },
           {
-            id: 'jurassic-dino-encounter',
-            title: 'ジュラシック・パーク・ディノ・エンカウンター',
+            id: 'jurassic-dino-greet',
+            title: 'ジュラシック・パーク・ダイナソー・ミート ＆ グリート',
             category: 'greeting',
             duration: 20,
             area: 'ジュラシック・パーク',
             color: 'emerald',
             enabled: false,
-            times: ['10:00', '10:55', '11:50', '13:50', '15:25'],
+            times: ['10:00', '10:55', '11:50', '12:45', '14:15', '15:10', '16:05', '17:00'],
             selectedTimes: []
           },
           {
-            id: 'hogwarts-magical-night',
-            title: 'ホグワーツ・マジカル・ナイト ～ウインター・マジック～',
+            id: 'minion-cool-winter-greet',
+            title: 'ミニオン・クール・ウインター・グリーティング',
+            category: 'greeting',
+            duration: 20,
+            area: 'ミニオン・パーク',
+            color: 'amber',
+            enabled: false,
+            times: ['09:45', '11:05', '12:40', '15:05', '16:25'],
+            selectedTimes: []
+          },
+          {
+            id: 'light-up-the-night-christmas',
+            title: 'ライト・アップ・ザ・ナイト ～クリスマス・セレブレーション～',
             category: 'show',
-            duration: 10,
-            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+            duration: 15,
+            area: 'グラマシーパーク',
             color: 'blue',
             enabled: false,
-            times: ['17:50', '18:10', '18:30', '18:50', '19:10'],
+            times: ['17:30', '19:30'],
             selectedTimes: []
           },
           {
-            id: 'kitty-christmas-band',
-            title: 'ハローキティのクリスマス・ハピネス・ブラスバンド',
+            id: 'joy-of-lights',
+            title: 'ジョイ・オブ・ライツ',
             category: 'show',
+            duration: 15,
+            area: 'ニューヨーク・エリア',
+            color: 'amber',
+            enabled: false,
+            times: ['18:00', '20:00'],
+            selectedTimes: []
+          },
+          {
+            id: 'holiday-frog-choir',
+            title: 'ホリデー・フロッグ・クワイア',
+            category: 'show',
+            duration: 20,
+            area: 'ウィザーディング・ワールド・オブ・ハリー・ポッター',
+            color: 'emerald',
+            enabled: false,
+            times: ['10:50', '11:50', '12:50', '15:35', '16:35'],
+            selectedTimes: []
+          },
+          {
+            id: 'studio-stars-greet',
+            title: 'スタジオ・スターズ・レストラン・キャラクター・ミート&グリート',
+            category: 'greeting',
             duration: 20,
             area: 'ハリウッド・エリア',
             color: 'rose',
             enabled: false,
-            times: ['12:25', '14:45', '16:25'],
-            selectedTimes: []
-          },
-          {
-            id: 'peanuts-christmas-greeting',
-            title: 'ピーナッツ・クリスマス・グリーティング',
-            category: 'greeting',
-            duration: 20,
-            area: 'ユニバーサル・ワンダーランド',
-            color: 'amber',
-            enabled: false,
-            times: ['12:10', '13:40', '15:10', '16:35'],
+            times: ['18:10', '20:10'],
             selectedTimes: []
           }
         ];
 
-        // 日付が基準日（2026-11-23）以外のとき、平日/休日傾向に合わせて時刻を微調整シミュレート
-        if (dateStr && dateStr !== '2026-11-23') {
+        // 日付が基準日（2026-11-25）以外のとき、平日/休日傾向に合わせて時刻を微調整シミュレート
+        if (dateStr && dateStr !== '2026-11-25') {
           const dayNum = new Date(dateStr + 'T00:00:00').getDay();
           const isWeekday = dayNum >= 1 && dayNum <= 5;
           if (isWeekday) {
             base.forEach((s) => {
-              if (s.times.length >= 5 && s.id !== 'hogwarts-magical-night') {
+              if (s.times.length >= 5) {
                 s.times = s.times.filter((_, idx) => idx !== s.times.length - 2);
               }
             });
           }
         }
         return base;
+      }
+
+      function normalizeTimeHHMM(raw, fallback) {
+        const m = String(raw || '').match(/([01]?\d|2[0-3]):([0-5]\d)/);
+        if (!m) return fallback;
+        return String(parseInt(m[1], 10)).padStart(2, '0') + ':' + String(parseInt(m[2], 10)).padStart(2, '0');
+      }
+
+      function getCalendarBounds() {
+        const openMin = timeToMin(state.openTime || DEFAULT_OPEN_TIME);
+        const closeMin = timeToMin(state.closeTime || DEFAULT_CLOSE_TIME);
+        let earliestSlotMin = Infinity;
+        let latestSlotEndMin = -Infinity;
+
+        state.shows.forEach((show) => {
+          (show.times || []).forEach((t) => {
+            const st = timeToMin(t);
+            const ed = st + (show.duration || 25);
+            if (st < earliestSlotMin) earliestSlotMin = st;
+            if (ed > latestSlotEndMin) latestSlotEndMin = ed;
+          });
+        });
+
+        const startMin = Math.floor(Math.min(openMin, Number.isFinite(earliestSlotMin) ? earliestSlotMin : openMin) / 15) * 15;
+        const endMin = Math.ceil(Math.max(closeMin, Number.isFinite(latestSlotEndMin) ? latestSlotEndMin : closeMin) / 15) * 15;
+        return {
+          startMin: Math.max(0, startMin),
+          endMin: Math.min(24 * 60, Math.max(startMin + 60, endMin)),
+          openMin,
+          closeMin
+        };
       }
 
       function sanitizeRoomId(raw) {
@@ -868,7 +914,9 @@
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.shows)) {
             return {
-              date: parsed.date || '2026-11-23',
+              date: parsed.date || '2026-11-25',
+              openTime: normalizeTimeHHMM(parsed.openTime, DEFAULT_OPEN_TIME),
+              closeTime: normalizeTimeHHMM(parsed.closeTime, DEFAULT_CLOSE_TIME),
               shows: normalizeShows(parsed.shows),
               updatedAt: Number(parsed.updatedAt) || 0,
               dirtyOffline: Boolean(parsed.dirtyOffline)
@@ -884,6 +932,8 @@
         try {
           const payload = {
             date: state.date,
+            openTime: state.openTime,
+            closeTime: state.closeTime,
             shows: state.shows,
             updatedAt: state.updatedAt,
             dirtyOffline: Boolean(dirtyOffline)
@@ -942,7 +992,9 @@
 
       const state = {
         roomId: initialHash.roomId,
-        date: '2026-11-23',
+        date: '2026-11-25',
+        openTime: DEFAULT_OPEN_TIME,
+        closeTime: DEFAULT_CLOSE_TIME,
         shows: [],
         updatedAt: 0,
         dirtyOffline: false,
@@ -957,17 +1009,23 @@
 
       if (initialHash.importedState && (!existingLocal || initialHash.importedState.updatedAt > existingLocal.updatedAt)) {
         state.date = initialHash.importedState.date;
+        state.openTime = normalizeTimeHHMM(initialHash.importedState.openTime, DEFAULT_OPEN_TIME);
+        state.closeTime = normalizeTimeHHMM(initialHash.importedState.closeTime, DEFAULT_CLOSE_TIME);
         state.shows = initialHash.importedState.shows;
         state.updatedAt = initialHash.importedState.updatedAt;
         saveLocalRoomData(true);
       } else if (existingLocal) {
         state.date = existingLocal.date;
+        state.openTime = existingLocal.openTime;
+        state.closeTime = existingLocal.closeTime;
         state.shows = existingLocal.shows;
         state.updatedAt = existingLocal.updatedAt;
         state.dirtyOffline = existingLocal.dirtyOffline;
       } else {
-        state.date = '2026-11-23';
-        state.shows = createDefaultShows('2026-11-23');
+        state.date = '2026-11-25';
+        state.openTime = DEFAULT_OPEN_TIME;
+        state.closeTime = DEFAULT_CLOSE_TIME;
+        state.shows = createDefaultShows('2026-11-25');
         state.updatedAt = 0;
         state.dirtyOffline = false;
       }
@@ -982,6 +1040,8 @@
       window.getExportableScheduleData = function () {
         return {
           date: state.date,
+          openTime: state.openTime,
+          closeTime: state.closeTime,
           shows: state.shows,
           updatedAt: state.updatedAt || Date.now(),
           dirtyOffline: Boolean(state.dirtyOffline)
@@ -998,7 +1058,9 @@
 
       window.applyRemoteScheduleData = function (remoteData) {
         if (!remoteData || !Array.isArray(remoteData.shows)) return;
-        state.date = remoteData.date || state.date || '2026-11-23';
+        state.date = remoteData.date || state.date || '2026-11-25';
+        state.openTime = normalizeTimeHHMM(remoteData.openTime, state.openTime || DEFAULT_OPEN_TIME);
+        state.closeTime = normalizeTimeHHMM(remoteData.closeTime, state.closeTime || DEFAULT_CLOSE_TIME);
         state.shows = normalizeShows(remoteData.shows);
         state.updatedAt = Number(remoteData.updatedAt) || Date.now();
         saveLocalRoomData(false);
@@ -1192,7 +1254,7 @@
       // 日付更新（現在の見る/見ないON/OFFと、一致する選択済み時刻を保護して更新）
       function updateScheduleByDate() {
         const dateInput = document.getElementById('schedule-date');
-        const newDate = (dateInput && dateInput.value) ? dateInput.value : '2026-11-23';
+        const newDate = (dateInput && dateInput.value) ? dateInput.value : '2026-11-25';
         const freshDefaults = createDefaultShows(newDate);
         const oldMap = new Map(state.shows.map((s) => [s.id, s]));
 
@@ -1262,6 +1324,11 @@
         const dateEl = document.getElementById('schedule-date');
         if (dateEl && dateEl.value !== state.date) {
           dateEl.value = state.date;
+        }
+
+        const parkHoursText = document.getElementById('park-hours-text');
+        if (parkHoursText) {
+          parkHoursText.textContent = `${state.openTime}〜${state.closeTime}`;
         }
 
         const sourceText = document.getElementById('schedule-source-text');
@@ -1545,8 +1612,9 @@
         const wrapper = document.getElementById('calendar-canvas-wrapper');
         wrapper.innerHTML = '';
 
+        const { startMin: calStartMin, endMin: calEndMin, openMin, closeMin } = getCalendarBounds();
         const pxPerMin = ZOOM_PRESETS[state.zoomIndex].pxPerMin;
-        const totalMinutes = CALENDAR_END_MIN - CALENDAR_START_MIN;
+        const totalMinutes = calEndMin - calStartMin;
         const bodyHeight = Math.round(totalMinutes * pxPerMin);
         const headerHeight = 34;
 
@@ -1593,8 +1661,8 @@
         lanesArea.className = 'flex-1 relative flex min-w-[460px] sm:min-w-0';
 
         // 15分刻みの横罫線
-        for (let m = CALENDAR_START_MIN; m <= CALENDAR_END_MIN; m += 15) {
-          const topPx = (m - CALENDAR_START_MIN) * pxPerMin;
+        for (let m = calStartMin; m <= calEndMin; m += 15) {
+          const topPx = (m - calStartMin) * pxPerMin;
           const isHour = m % 60 === 0;
           const isHalf = m % 30 === 0 && !isHour;
 
@@ -1618,6 +1686,26 @@
           }
         }
 
+        // オープン・クローズ基準ライン描画
+        [
+          { min: openMin, label: `オープン ${state.openTime}`, cls: 'border-emerald-500 text-emerald-800 bg-emerald-50/95' },
+          { min: closeMin, label: `クローズ ${state.closeTime}`, cls: 'border-indigo-500 text-indigo-900 bg-indigo-50/95' }
+        ].forEach((marker) => {
+          if (marker.min >= calStartMin && marker.min <= calEndMin) {
+            const topPx = (marker.min - calStartMin) * pxPerMin;
+            const guideLine = document.createElement('div');
+            guideLine.className = `absolute left-0 right-0 border-t-2 border-dashed pointer-events-none z-10 ${marker.cls.split(' ')[0]}`;
+            guideLine.style.top = `${topPx}px`;
+            lanesArea.appendChild(guideLine);
+
+            const tag = document.createElement('div');
+            tag.className = `absolute right-2 -translate-y-1/2 px-1.5 py-0.5 rounded border text-[9px] font-extrabold pointer-events-none z-10 ${marker.cls}`;
+            tag.style.top = `${topPx}px`;
+            tag.textContent = marker.label;
+            lanesArea.appendChild(tag);
+          }
+        });
+
         // イベント収集
         const onEvents = [];
         const offEvents = [];
@@ -1628,7 +1716,7 @@
           show.times.forEach((t, idx) => {
             const startMin = timeToMin(t);
             const endMin = startMin + show.duration;
-            if (endMin < CALENDAR_START_MIN || startMin > CALENDAR_END_MIN) return;
+            if (endMin < calStartMin || startMin > calEndMin) return;
 
             const isSelected = show.enabled && show.selectedTimes.includes(t);
             if (state.viewMode === 'selected' && !isSelected) return;
@@ -1658,15 +1746,15 @@
           const offLane = document.createElement('div');
           offLane.className = 'w-[40%] relative bg-slate-50/45';
 
-          renderLaneBlocks(onLane, computeColumnLayout(onEvents), true, pxPerMin, selectedItems, conflictKeys);
-          renderLaneBlocks(offLane, computeColumnLayout(offEvents), false, pxPerMin, selectedItems, conflictKeys);
+          renderLaneBlocks(onLane, computeColumnLayout(onEvents), true, pxPerMin, calStartMin, selectedItems, conflictKeys);
+          renderLaneBlocks(offLane, computeColumnLayout(offEvents), false, pxPerMin, calStartMin, selectedItems, conflictKeys);
 
           lanesArea.appendChild(onLane);
           lanesArea.appendChild(offLane);
         } else {
           const singleLane = document.createElement('div');
           singleLane.className = 'flex-1 relative';
-          renderLaneBlocks(singleLane, computeColumnLayout(onEvents), true, pxPerMin, selectedItems, conflictKeys);
+          renderLaneBlocks(singleLane, computeColumnLayout(onEvents), true, pxPerMin, calStartMin, selectedItems, conflictKeys);
           lanesArea.appendChild(singleLane);
         }
 
@@ -1675,7 +1763,7 @@
         wrapper.appendChild(canvasRow);
       }
 
-      function renderLaneBlocks(container, layoutEvents, isOnLane, pxPerMin, selectedItems, conflictKeys) {
+      function renderLaneBlocks(container, layoutEvents, isOnLane, pxPerMin, calStartMin, selectedItems, conflictKeys) {
         layoutEvents.forEach((ev) => {
           const { show, time, runNumber, startMin, endMin, isSelected, key, _col, _totalCols } = ev;
           const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
@@ -1685,7 +1773,7 @@
           // このショーを何回見る予定か
           const showWatchCount = show.enabled ? show.selectedTimes.length : 0;
 
-          const topPx = Math.max(0, (startMin - CALENDAR_START_MIN) * pxPerMin) + 1;
+          const topPx = Math.max(0, (startMin - calStartMin) * pxPerMin) + 1;
           const heightPx = Math.max(26, (endMin - startMin) * pxPerMin - 2);
           const widthPct = 100 / _totalCols;
           const leftPct = _col * widthPct;
@@ -2052,6 +2140,13 @@
           state.date = `${y}-${m}-${d}`;
         }
 
+        // 「本日の営業時間 09:00〜21:00」などがあればオープン・クローズ時刻も反映
+        const hoursMatch = String(rawText || '').match(/本日の営業時間\s*([01]?\d|2[0-3]):([0-5]\d)\s*[〜～\-–]\s*([01]?\d|2[0-3]):([0-5]\d)/);
+        if (hoursMatch) {
+          state.openTime = normalizeTimeHHMM(`${hoursMatch[1]}:${hoursMatch[2]}`, state.openTime);
+          state.closeTime = normalizeTimeHHMM(`${hoursMatch[3]}:${hoursMatch[4]}`, state.closeTime);
+        }
+
         const palette = ['rose', 'purple', 'amber', 'cyan', 'blue', 'emerald'];
         const existingMap = new Map(state.shows.map((s) => [normalizeCompareTitle(s.title), s]));
         const matchedExistingIds = new Set();
@@ -2081,14 +2176,14 @@
               duration: entry.duration,
               area: entry.area,
               color: palette[idx % palette.length],
-              enabled: false,
+              enabled: shouldDefaultWatch(entry.title),
               times: entry.times,
               selectedTimes: []
             });
           }
         });
 
-        if (!replaceUnlisted) {
+        if (!safeReplaceUnlisted) {
           state.shows.forEach((s) => {
             if (!matchedExistingIds.has(s.id)) {
               nextShows.push(s);
@@ -2128,6 +2223,49 @@
         document.getElementById('import-modal-overlay').addEventListener('click', (e) => {
           if (e.target.id === 'import-modal-overlay') closeImportModal();
         });
+        document.getElementById('btn-import-official-preset').addEventListener('click', () => {
+          document.getElementById('input-import-text').value = [
+            '営業時間・スケジュール',
+            '2026年11月25日',
+            '時刻表',
+            'ウィキッド ～オズの魔女たち～',
+            '10:2511:3013:0515:4517:30',
+            'NO LIMIT! パレード ～Discover U!!! バージョン～',
+            '14:00',
+            'クロミ・ライブ ～ Discover Me Discover U!!! ～',
+            '09:5011:2513:00',
+            'アルティメット・ブルース・バッシュ ～音楽の色～',
+            '15:1016:4518:2520:25',
+            'ユニバーサル・ワンダーランド ～レッツ・スマイル・トゥギャザー！〜',
+            '09:4511:0512:2514:5516:15',
+            'ホグズミード・マジカル・クリーチャーズ・ミート',
+            '10:3011:3012:3014:4515:45',
+            'ヒッポグリフ・マジカル・レッスン',
+            '09:3010:2011:2012:2013:2014:1015:0516:05',
+            'Discover U!!! タイム',
+            '12:00',
+            'ジュラシック・パーク・ダイナソー・ミート ＆ グリート',
+            '10:0010:5511:5012:4514:1515:1016:0517:00',
+            'ミニオン・クール・ウインター・グリーティング',
+            '09:4511:0512:4015:0516:25',
+            'パワー・オブ・ロック ～ホリデー・ロッキン！～',
+            '10:5512:3515:0516:4518:25',
+            'ライト・アップ・ザ・ナイト ～クリスマス・セレブレーション～',
+            '17:3019:30',
+            'ジョイ・オブ・ライツ',
+            '18:0020:00',
+            'ホリデー・フロッグ・クワイア',
+            '10:5011:5012:5015:3516:35',
+            'スタジオ・スターズ・レストラン・キャラクター・ミート&グリート',
+            '18:1020:10',
+            'トライウィザード・スピリット・ラリー',
+            '休止中',
+            'ウォーターワールド',
+            '12:1514:3016:45',
+            'ユニバーサル・モンスター・ライブ・ロックンロール・ショー',
+            '11:1513:0014:4516:3018:1520:00'
+          ].join('\n');
+        });
         document.getElementById('btn-import-sample').addEventListener('click', () => {
           document.getElementById('input-import-text').value = [
             'パワー・オブ・ロック ～ホリデー・ロッキン！～（約25分・ニューヨーク・エリア）',
@@ -2140,11 +2278,71 @@
             '14:00'
           ].join('\n');
         });
+        document.getElementById('btn-import-usj-1125').addEventListener('click', () => {
+          document.getElementById('input-import-text').value = [
+            '2026年11月25日',
+            '',
+            'ウィキッド ～オズの魔女たち～',
+            '10:25 / 11:30 / 13:05 / 15:45 / 17:30',
+            '',
+            'NO LIMIT! パレード ～Discover U!!! バージョン～（パレードルート全域）',
+            '14:00',
+            '',
+            'クロミ・ライブ ～ Discover Me Discover U!!! ～（ニューヨーク・エリア）',
+            '09:50 / 11:25 / 13:00',
+            '',
+            'アルティメット・ブルース・バッシュ ～音楽の色～',
+            '15:10 / 16:45 / 18:25 / 20:25',
+            '',
+            'ユニバーサル・ワンダーランド ～レッツ・スマイル・トゥギャザー！〜（ユニバーサル・ワンダーランド）',
+            '09:45 / 11:05 / 12:25 / 14:55 / 16:15',
+            '',
+            'ホグズミード・マジカル・クリーチャーズ・ミート',
+            '10:30 / 11:30 / 12:30 / 14:45 / 15:45',
+            '',
+            'ヒッポグリフ・マジカル・レッスン',
+            '09:30 / 10:20 / 11:20 / 12:20 / 13:20 / 14:10 / 15:05 / 16:05',
+            '',
+            'Discover U!!! タイム',
+            '12:00',
+            '',
+            'ジュラシック・パーク・ダイナソー・ミート ＆ グリート（ジュラシック・パーク）',
+            '10:00 / 10:55 / 11:50 / 12:45 / 14:15 / 15:10 / 16:05 / 17:00',
+            '',
+            'ミニオン・クール・ウインター・グリーティング（ミニオン・パーク）',
+            '09:45 / 11:05 / 12:40 / 15:05 / 16:25',
+            '',
+            'パワー・オブ・ロック ～ホリデー・ロッキン！～（ニューヨーク・エリア）',
+            '10:55 / 12:35 / 15:05 / 16:45 / 18:25',
+            '',
+            'ライト・アップ・ザ・ナイト ～クリスマス・セレブレーション～',
+            '17:30 / 19:30',
+            '',
+            'ジョイ・オブ・ライツ',
+            '18:00 / 20:00',
+            '',
+            'ホリデー・フロッグ・クワイア',
+            '10:50 / 11:50 / 12:50 / 15:35 / 16:35',
+            '',
+            'スタジオ・スターズ・レストラン・キャラクター・ミート&グリート',
+            '18:10 / 20:10',
+            '',
+            'ウォーターワールド（ウォーターワールド）',
+            '12:15 / 14:30 / 16:45',
+            '',
+            'ユニバーサル・モンスター・ライブ・ロックンロール・ショー（ハリウッド・エリア）',
+            '11:15 / 13:00 / 14:45 / 16:30 / 18:15 / 20:00'
+          ].join('\n');
+        });
         document.getElementById('import-schedule-form').addEventListener('submit', (e) => {
           e.preventDefault();
           const rawText = document.getElementById('input-import-text').value;
           const replaceAll = document.getElementById('input-import-replace-all').checked;
-          applyImportedScheduleText(rawText, replaceAll);
+          const safeReplaceUnlisted = replaceAll && parseSchedulePasteText(rawText).length >= 3;
+          if (replaceAll && !safeReplaceUnlisted) {
+            showToast('⚠️ 読み取れた演目が少ないため、既存演目は保護して反映しました');
+          }
+          applyImportedScheduleText(rawText, safeReplaceUnlisted);
         });
 
         // 誤タップ防止の2段階リセット
@@ -2164,10 +2362,10 @@
           clearTimeout(state.resetConfirmTimer);
           state.resetConfirmTimer = null;
           resetBtn.textContent = '↺';
-          resetBtn.classList.remove('bg-red-600', 'text-white');
-
-          state.date = '2026-11-23';
-          state.shows = createDefaultShows('2026-11-23');
+          state.date = '2026-11-25';
+          state.openTime = DEFAULT_OPEN_TIME;
+          state.closeTime = DEFAULT_CLOSE_TIME;
+          state.shows = createDefaultShows('2026-11-25');
           commitUserChange('↺ 初期スケジュールに戻しました');
         });
 
@@ -2484,6 +2682,8 @@
         const nowTs = payload.updatedAt || Date.now();
         await setDoc(docRef, {
           date: payload.date,
+          openTime: payload.openTime || '09:00',
+          closeTime: payload.closeTime || '21:00',
           shows: payload.shows,
           updatedAt: nowTs,
           writeToken
