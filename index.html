@@ -97,7 +97,7 @@
         <!-- 日付選択＆コンパクトアクション群 -->
         <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <div class="flex items-center bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 gap-1">
-            <input id="schedule-date" type="date" value="2026-11-23" title="対象日を選択"
+            <input id="schedule-date" type="date" value="2026-11-25" title="対象日を選択"
               class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[108px] sm:w-auto" />
           </div>
 
@@ -467,7 +467,7 @@
 
       <form id="import-schedule-form" class="p-4 sm:p-5 flex flex-col gap-3.5 max-h-[82dvh] overflow-y-auto">
         <div class="bg-sky-50 border border-sky-200 rounded-xl p-3 text-[11px] text-sky-950 leading-relaxed">
-          USJ公式スケジュールページを<strong>そのまま全選択コピー（Ctrl+A → Ctrl+C）して貼り付け</strong>てもOKです。くっついた時刻（<code>10:2511:30</code>）や日付（<code>2026年11月25日</code>）も自動判別し、既存のON/OFF状態や決定済みの時間はできるだけ保持します。
+          USJ公式スケジュールページを<strong>そのまま全選択コピー（Ctrl+A → Ctrl+C）して貼り付け</strong>てもOKです。くっついた時刻（<code>10:2511:30</code>）や日付（<code>2026年11月25日</code>）も自動判別し、取り込んだスケジュールで演目リストを書き換えます。
         </div>
 
         <div>
@@ -479,8 +479,8 @@
 
         <div class="flex items-center justify-between gap-2 text-xs">
           <label class="inline-flex items-center gap-1.5 font-bold text-slate-700 cursor-pointer">
-            <input id="input-import-replace-all" type="checkbox" class="rounded border-slate-300 text-sky-700 focus:ring-sky-600" />
-            <span>取り込みにない既存演目はリストから外す</span>
+            <input id="input-import-replace-all" type="checkbox" checked class="rounded border-slate-300 text-sky-700 focus:ring-sky-600" />
+            <span>取り込んだスケジュールで演目リストを完全に書き換える</span>
           </label>
           <div class="flex items-center gap-2 shrink-0">
             <button id="btn-import-official-preset" type="button" class="text-[11px] font-extrabold text-emerald-700 hover:underline cursor-pointer">
@@ -785,7 +785,6 @@
           }
         ];
 
-        // 日付が基準日（2026-11-25）以外のとき、平日/休日傾向に合わせて時刻を微調整シミュレート
         if (dateStr && dateStr !== '2026-11-25') {
           const dayNum = new Date(dateStr + 'T00:00:00').getDay();
           const isWeekday = dayNum >= 1 && dayNum <= 5;
@@ -849,34 +848,68 @@
       }
 
       function formatDisplayDate(dateStr) {
-        if (!dateStr) return '2026/11/23';
+        if (!dateStr) return '2026/11/25';
         return dateStr.replace(/-/g, '/');
       }
 
-      function normalizeShows(rawShows) {
-        if (!Array.isArray(rawShows)) return createDefaultShows('2026-11-23');
-        return rawShows.map((s, idx) => {
-          const times = Array.isArray(s.times)
-            ? Array.from(new Set(s.times.filter(Boolean))).sort()
-            : [];
-          const selectedTimes = Array.isArray(s.selectedTimes)
-            ? s.selectedTimes.filter((t) => times.includes(t)).sort()
-            : [];
-          return {
-            id: s.id || ('custom-' + idx + '-' + Date.now()),
-            title: String(s.title || '無題の演目'),
-            category: CATEGORY_ICONS[s.category] ? s.category : 'show',
-            duration: Math.max(5, Math.min(180, parseInt(s.duration, 10) || 25)),
-            area: String(s.area || 'パーク内'),
-            color: COLOR_THEMES[s.color] ? s.color : 'blue',
-            enabled: Boolean(s.enabled),
-            times,
-            selectedTimes
-          };
-        });
+      function normalizeCompareTitle(title) {
+        return String(title || '')
+          .replace(/[（\(][^）\)]*[）\)]/g, '')
+          .replace(/[～〜~・･＆&＋+\s!！?？。、,．.]+/g, '')
+          .toLowerCase()
+          .trim();
       }
 
-      // UI設定の読み書き
+      function deduplicateShows(showList) {
+        if (!Array.isArray(showList)) return [];
+        const mergedByKey = new Map();
+        const orderKeys = [];
+
+        showList.forEach((raw, idx) => {
+          const title = String(raw.title || '無題の演目').trim();
+          const key = normalizeCompareTitle(title) || ('__idx_' + idx);
+          const times = Array.isArray(raw.times) ? Array.from(new Set(raw.times.filter(Boolean))).sort() : [];
+          const selectedTimes = Array.isArray(raw.selectedTimes)
+            ? Array.from(new Set(raw.selectedTimes.filter((t) => times.includes(t)))).sort()
+            : [];
+
+          if (!mergedByKey.has(key)) {
+            mergedByKey.set(key, {
+              id: raw.id || ('show-' + idx + '-' + Date.now()),
+              title,
+              category: CATEGORY_ICONS[raw.category] ? raw.category : 'show',
+              duration: Math.max(5, Math.min(180, parseInt(raw.duration, 10) || 25)),
+              area: String(raw.area || 'パーク内'),
+              color: COLOR_THEMES[raw.color] ? raw.color : 'blue',
+              enabled: Boolean(raw.enabled),
+              times,
+              selectedTimes
+            });
+            orderKeys.push(key);
+          } else {
+            const existing = mergedByKey.get(key);
+            existing.enabled = existing.enabled || Boolean(raw.enabled);
+            if ((!existing.area || existing.area === 'パーク内') && raw.area && raw.area !== 'パーク内') {
+              existing.area = String(raw.area);
+            }
+            if (title.length > existing.title.length) {
+              existing.title = title;
+            }
+            existing.times = Array.from(new Set([...existing.times, ...times])).sort();
+            existing.selectedTimes = Array.from(
+              new Set([...existing.selectedTimes, ...selectedTimes].filter((t) => existing.times.includes(t)))
+            ).sort();
+          }
+        });
+
+        return orderKeys.map((k) => mergedByKey.get(k));
+      }
+
+      function normalizeShows(rawShows) {
+        if (!Array.isArray(rawShows)) return deduplicateShows(createDefaultShows('2026-11-25'));
+        return deduplicateShows(rawShows);
+      }
+
       function loadPrefs() {
         try {
           const raw = localStorage.getItem(STORAGE_PREFS_KEY);
@@ -901,7 +934,6 @@
         }
       }
 
-      // ルームごとのスケジュール状態をlocalStorageへ即座に保存（リロード初期化を完全防止）
       function loadLocalRoomData(roomId) {
         try {
           const raw = localStorage.getItem(STORAGE_ROOM_PREFIX + sanitizeRoomId(roomId));
@@ -940,7 +972,15 @@
         }
       }
 
-      // URLハッシュ解析（#room=XXX や過去の #state=... を安全に処理）
+      function updateUrlRoomHash(roomId) {
+        const safe = sanitizeRoomId(roomId);
+        try {
+          window.history.replaceState(null, '', '#room=' + encodeURIComponent(safe));
+        } catch (e) {
+          window.location.hash = 'room=' + encodeURIComponent(safe);
+        }
+      }
+
       function parseInitialUrlHash(savedLastRoom) {
         const hash = window.location.hash.replace(/^#/, '');
         const params = new URLSearchParams(hash);
@@ -955,7 +995,9 @@
             const decoded = JSON.parse(jsonStr);
             if (decoded && Array.isArray(decoded.shows)) {
               importedState = {
-                date: decoded.date || '2026-11-23',
+                date: decoded.date || '2026-11-25',
+                openTime: normalizeTimeHHMM(decoded.openTime, DEFAULT_OPEN_TIME),
+                closeTime: normalizeTimeHHMM(decoded.closeTime, DEFAULT_CLOSE_TIME),
                 shows: normalizeShows(decoded.shows),
                 updatedAt: Number(decoded.updatedAt) || Date.now()
               };
@@ -965,22 +1007,10 @@
           }
         }
 
-        // URL末尾の古い state=... がリロードのたびに上書きしないよう、クリーンな #room=... に整える
         updateUrlRoomHash(resolvedRoom);
-
         return { roomId: resolvedRoom, importedState };
       }
 
-      function updateUrlRoomHash(roomId) {
-        const safe = sanitizeRoomId(roomId);
-        try {
-          window.history.replaceState(null, '', '#room=' + encodeURIComponent(safe));
-        } catch (e) {
-          window.location.hash = 'room=' + encodeURIComponent(safe);
-        }
-      }
-
-      // アプリ全体の状態初期化
       const savedPrefs = loadPrefs();
       const initialHash = parseInitialUrlHash(savedPrefs.lastRoomId);
       const existingLocal = loadLocalRoomData(initialHash.roomId);
@@ -1004,8 +1034,8 @@
 
       if (initialHash.importedState && (!existingLocal || initialHash.importedState.updatedAt > existingLocal.updatedAt)) {
         state.date = initialHash.importedState.date;
-        state.openTime = normalizeTimeHHMM(initialHash.importedState.openTime, DEFAULT_OPEN_TIME);
-        state.closeTime = normalizeTimeHHMM(initialHash.importedState.closeTime, DEFAULT_CLOSE_TIME);
+        state.openTime = initialHash.importedState.openTime;
+        state.closeTime = initialHash.importedState.closeTime;
         state.shows = initialHash.importedState.shows;
         state.updatedAt = initialHash.importedState.updatedAt;
         saveLocalRoomData(true);
@@ -1026,7 +1056,6 @@
       }
       savePrefs();
 
-      // グローバル連携ブリッジ（Firebaseモジュールから参照）
       window.USJSyncState = {
         get roomId() { return state.roomId; },
         set roomId(val) { state.roomId = sanitizeRoomId(val); }
@@ -1065,7 +1094,6 @@
         if (el) el.textContent = '最終クラウド受信: ' + timeStr + '（端末内にも保存済）';
       };
 
-      // ユーザー操作による状態変更の共通コミット関数
       function commitUserChange(toastMessage) {
         state.updatedAt = Date.now();
         saveLocalRoomData(true);
@@ -1076,7 +1104,6 @@
         if (toastMessage) showToast(toastMessage);
       }
 
-      // トースト表示
       function showToast(message, variant) {
         const container = document.getElementById('toast-container');
         if (!container) return;
@@ -1095,7 +1122,28 @@
       }
       window.showUSJToast = showToast;
 
-      // 決定済み公演の重複検出
+      function switchRoom(newRoomId) {
+        const safe = sanitizeRoomId(newRoomId);
+        state.roomId = safe;
+        updateUrlRoomHash(safe);
+        savePrefs();
+
+        const localForRoom = loadLocalRoomData(safe);
+        if (localForRoom) {
+          state.date = localForRoom.date;
+          state.openTime = localForRoom.openTime;
+          state.closeTime = localForRoom.closeTime;
+          state.shows = localForRoom.shows;
+          state.updatedAt = localForRoom.updatedAt;
+          state.dirtyOffline = localForRoom.dirtyOffline;
+        }
+        renderAll();
+        if (typeof window.switchCloudRoom === 'function') {
+          window.switchCloudRoom(safe);
+        }
+        showToast(`🔑 合言葉「${safe}」に切り替えました`);
+      }
+
       function getSelectedSlotsWithConflicts() {
         const selectedItems = [];
         state.shows.forEach((show) => {
@@ -1135,12 +1183,10 @@
         return { selectedItems, conflictKeys, conflictPairs };
       }
 
-      // 候補枠が既に決定済みの他演目と被っているかチェック
       function doesCandidateOverlapSelected(showId, startMin, endMin, selectedItems) {
         return selectedItems.some((sel) => sel.showId !== showId && sel.endMin > startMin && endMin > sel.startMin);
       }
 
-      // === アクションハンドラ ===
       function toggleShowEnabled(showId) {
         const target = state.shows.find((s) => s.id === showId);
         if (!target) return;
@@ -1190,14 +1236,11 @@
         }
       }
 
-      // 重複の自動調整アルゴリズム（選択中の演目をできるだけ多く重複なしで配置）
       function autoResolveConflicts() {
         const targetShows = state.shows.filter((s) => s.enabled && s.selectedTimes.length > 0 && s.times.length > 0);
         if (targetShows.length <= 1) return;
 
-        // 選択肢が少ない演目（パレード等の1回公演）を優先固定するためソート
         const ordered = [...targetShows].sort((a, b) => a.times.length - b.times.length);
-
         let bestAssignment = null;
         let bestCount = -1;
 
@@ -1212,7 +1255,6 @@
           }
 
           const show = ordered[index];
-          // 現在選んでいる時刻を最初に試すよう並び替え
           const candidateTimes = [...show.times].sort((a, b) => {
             const aSel = show.selectedTimes.includes(a) ? 0 : 1;
             const bSel = show.selectedTimes.includes(b) ? 0 : 1;
@@ -1230,7 +1272,6 @@
               if (bestCount === ordered.length) return;
             }
           }
-          // どうしても入らない場合はスキップ分岐も探索
           dfs(index + 1, chosenList);
         }
 
@@ -1246,18 +1287,19 @@
         }
       }
 
-      // 日付更新（現在の見る/見ないON/OFFと、一致する選択済み時刻を保護して更新）
       function updateScheduleByDate() {
         const dateInput = document.getElementById('schedule-date');
         const newDate = (dateInput && dateInput.value) ? dateInput.value : '2026-11-25';
+        const currentDeduped = deduplicateShows(state.shows);
         const freshDefaults = createDefaultShows(newDate);
-        const oldMap = new Map(state.shows.map((s) => [s.id, s]));
+        const oldMap = new Map(currentDeduped.map((s) => [normalizeCompareTitle(s.title), s]));
 
         const merged = freshDefaults.map((fresh) => {
-          const prev = oldMap.get(fresh.id);
+          const normKey = normalizeCompareTitle(fresh.title);
+          const prev = oldMap.get(normKey);
           if (!prev) return fresh;
           const preservedSelected = prev.selectedTimes.filter((t) => fresh.times.includes(t));
-          oldMap.delete(fresh.id);
+          oldMap.delete(normKey);
           return {
             ...fresh,
             enabled: prev.enabled,
@@ -1265,17 +1307,15 @@
           };
         });
 
-        // ユーザーが手動追加したカスタム演目もそのまま残す
         oldMap.forEach((customShow) => {
           merged.push(customShow);
         });
 
         state.date = newDate;
-        state.shows = merged;
-        commitUserChange(`📅 ${formatDisplayDate(newDate)} の公演スケジュールを反映しました（ON/OFF維持）`);
+        state.shows = deduplicateShows(merged);
+        commitUserChange(`📅 ${formatDisplayDate(newDate)} の公演スケジュールを反映しました（重複整理・ON/OFF維持）`);
       }
 
-      // LINE等へ貼り付けやすいテキストコピー
       async function copyPlanText() {
         const { selectedItems } = getSelectedSlotsWithConflicts();
         const enabledShows = state.shows.filter((s) => s.enabled);
@@ -1314,7 +1354,6 @@
         }
       }
 
-      // === 描画処理 ===
       function renderAll() {
         const dateEl = document.getElementById('schedule-date');
         if (dateEl && dateEl.value !== state.date) {
@@ -1372,7 +1411,6 @@
           overlapBanner.classList.remove('flex');
         }
 
-        // カテゴリボタン更新
         document.querySelectorAll('.cat-btn').forEach((btn) => {
           const isAct = btn.dataset.cat === state.activeCategory;
           btn.className = isAct
@@ -1380,7 +1418,6 @@
             : 'cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer';
         });
 
-        // カレンダー上部ボタン更新
         const laneBtn = document.getElementById('btn-toggle-lanes');
         laneBtn.textContent = state.twoLaneMode ? '✅｜🙈 2列比較中' : '📋 1列統合表示';
 
@@ -1430,7 +1467,6 @@
       function createShowCardElement(show, isOn, selectedItems, conflictKeys) {
         const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
         const icon = CATEGORY_ICONS[show.category] || '🎪';
-        // このショーを何回見る予定か（選択中の公演数）
         const watchCount = isOn ? show.selectedTimes.length : 0;
 
         const card = document.createElement('div');
@@ -1438,7 +1474,6 @@
           ? 'bg-white rounded-xl p-2.5 border border-emerald-200/90 shadow-sm flex flex-col gap-1.5 transition hover:border-emerald-400'
           : 'bg-white/90 rounded-xl p-2.5 border border-slate-200 shadow-sm flex flex-col gap-1.5 transition hover:border-slate-300';
 
-        // 上段：所要時間＋「このショーを何回見るか」バッジ ＆ ON/OFF切替
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-1';
 
@@ -1469,7 +1504,6 @@
         topRow.appendChild(metaLeft);
         topRow.appendChild(toggleBtn);
 
-        // 中段：タイトル ＆ 時間編集ボタン
         const titleRow = document.createElement('div');
         titleRow.className = 'flex items-start justify-between gap-1';
 
@@ -1486,12 +1520,10 @@
         titleRow.appendChild(titleH4);
         titleRow.appendChild(editBtn);
 
-        // エリア行
         const areaDiv = document.createElement('div');
         areaDiv.className = 'text-[10px] text-slate-500 truncate';
         areaDiv.textContent = `📍 ${show.area}`;
 
-        // 時刻チップ群（各チップに「1回目・2回目…」の回数を表示）
         const chipsWrap = document.createElement('div');
         chipsWrap.className = 'flex flex-wrap gap-1 pt-0.5';
 
@@ -1552,7 +1584,6 @@
         return card;
       }
 
-      // カレンダー内の重なりブロックを横に綺麗に分けるレイアウト計算
       function computeColumnLayout(events) {
         if (events.length === 0) return [];
         const sorted = [...events].sort((a, b) => a.startMin - b.startMin || (b.endMin - b.startMin) - (a.endMin - a.startMin));
@@ -1613,7 +1644,6 @@
         const bodyHeight = Math.round(totalMinutes * pxPerMin);
         const headerHeight = 34;
 
-        // スティッキーヘッダー行
         const stickyHeader = document.createElement('div');
         stickyHeader.className = 'sticky top-0 z-20 flex bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 text-[11px] font-extrabold select-none';
         stickyHeader.style.height = `${headerHeight}px`;
@@ -1642,20 +1672,16 @@
         }
         wrapper.appendChild(stickyHeader);
 
-        // キャンバス本体
         const canvasRow = document.createElement('div');
         canvasRow.className = 'relative flex w-full';
         canvasRow.style.height = `${bodyHeight}px`;
 
-        // 時刻目盛り列
         const timeAxis = document.createElement('div');
         timeAxis.className = 'w-12 sm:w-14 shrink-0 relative border-r border-slate-200 bg-slate-50/50 select-none';
 
-        // グリッド＆イベント領域
         const lanesArea = document.createElement('div');
         lanesArea.className = 'flex-1 relative flex min-w-[460px] sm:min-w-0';
 
-        // 15分刻みの横罫線
         for (let m = calStartMin; m <= calEndMin; m += 15) {
           const topPx = (m - calStartMin) * pxPerMin;
           const isHour = m % 60 === 0;
@@ -1681,7 +1707,6 @@
           }
         }
 
-        // オープン・クローズ基準ライン描画
         [
           { min: openMin, label: `オープン ${state.openTime}`, cls: 'border-emerald-500 text-emerald-800 bg-emerald-50/95' },
           { min: closeMin, label: `クローズ ${state.closeTime}`, cls: 'border-indigo-500 text-indigo-900 bg-indigo-50/95' }
@@ -1701,7 +1726,6 @@
           }
         });
 
-        // イベント収集
         const onEvents = [];
         const offEvents = [];
 
@@ -1760,12 +1784,11 @@
 
       function renderLaneBlocks(container, layoutEvents, isOnLane, pxPerMin, calStartMin, selectedItems, conflictKeys) {
         layoutEvents.forEach((ev) => {
-          const { show, time, runNumber, startMin, endMin, isSelected, key, _col, _totalCols } = ev;
+          const { show, time, startMin, endMin, isSelected, key, _col, _totalCols } = ev;
           const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
           const icon = CATEGORY_ICONS[show.category] || '🎪';
           const isConflict = isSelected && conflictKeys.has(key);
           const candOverlap = isOnLane && !isSelected && doesCandidateOverlapSelected(show.id, startMin, endMin, selectedItems);
-          // このショーを何回見る予定か
           const showWatchCount = show.enabled ? show.selectedTimes.length : 0;
 
           const topPx = Math.max(0, (startMin - calStartMin) * pxPerMin) + 1;
@@ -1851,7 +1874,6 @@
         });
       }
 
-      // === 演目追加・編集モーダル ===
       function renderModalTimeChips() {
         const wrap = document.getElementById('modal-time-chips');
         wrap.innerHTML = '';
@@ -1916,7 +1938,6 @@
         overlay.classList.remove('flex');
       }
 
-      // === 同期モーダル開閉・ルーム切替 ===
       function openSyncModal() {
         const overlay = document.getElementById('sync-modal-overlay');
         document.getElementById('modal-current-room').textContent = state.roomId;
@@ -1930,96 +1951,6 @@
         overlay.classList.remove('flex');
       }
 
-      // === 貼り付けテキストの解析・取り込み ===
-      function normalizeCompareTitle(title) {
-        return String(title || '')
-          .replace(/[（\(][^）\)]*[）\)]/g, '')
-          .replace(/[～〜~・･＆&＋+\s!！?？。、,．.]+/g, '')
-          .toLowerCase()
-          .trim();
-      }
-
-      // 同一演目の重複カードを1つに統合（ON/OFF・選択済み時刻・公演時刻をマージ）
-      function deduplicateShows(showList) {
-        if (!Array.isArray(showList)) return [];
-        const mergedByKey = new Map();
-        const orderKeys = [];
-
-        showList.forEach((raw, idx) => {
-          const title = String(raw.title || '無題の演目').trim();
-          const key = normalizeCompareTitle(title) || ('__idx_' + idx);
-          const times = Array.isArray(raw.times) ? Array.from(new Set(raw.times.filter(Boolean))).sort() : [];
-          const selectedTimes = Array.isArray(raw.selectedTimes)
-            ? Array.from(new Set(raw.selectedTimes.filter((t) => times.includes(t)))).sort()
-            : [];
-
-          if (!mergedByKey.has(key)) {
-            mergedByKey.set(key, {
-              id: raw.id || ('show-' + idx + '-' + Date.now()),
-              title,
-              category: CATEGORY_ICONS[raw.category] ? raw.category : 'show',
-              duration: Math.max(5, Math.min(180, parseInt(raw.duration, 10) || 25)),
-              area: String(raw.area || 'パーク内'),
-              color: COLOR_THEMES[raw.color] ? raw.color : 'blue',
-              enabled: Boolean(raw.enabled),
-              times,
-              selectedTimes
-            });
-            orderKeys.push(key);
-          } else {
-            const existing = mergedByKey.get(key);
-            existing.enabled = existing.enabled || Boolean(raw.enabled);
-            if ((!existing.area || existing.area === 'パーク内') && raw.area && raw.area !== 'パーク内') {
-              existing.area = String(raw.area);
-            }
-            if (title.length > existing.title.length) {
-              existing.title = title;
-            }
-            existing.times = Array.from(new Set([...existing.times, ...times])).sort();
-            existing.selectedTimes = Array.from(
-              new Set([...existing.selectedTimes, ...selectedTimes].filter((t) => existing.times.includes(t)))
-            ).sort();
-          }
-        });
-
-        return orderKeys.map((k) => mergedByKey.get(k));
-      }
-
-      function normalizeShows(rawShows) {
-        if (!Array.isArray(rawShows)) return deduplicateShows(createDefaultShows('2026-11-25'));
-        return deduplicateShows(rawShows);
-      }
-      // 日付更新（現在の見る/見ないON/OFFと、一致する選択済み時刻を保護して更新）
-      function updateScheduleByDate() {
-        const dateInput = document.getElementById('schedule-date');
-        const newDate = (dateInput && dateInput.value) ? dateInput.value : '2026-11-25';
-        const currentDeduped = deduplicateShows(state.shows);
-        const freshDefaults = createDefaultShows(newDate);
-        const oldMap = new Map(currentDeduped.map((s) => [normalizeCompareTitle(s.title), s]));
-
-        const merged = freshDefaults.map((fresh) => {
-          const normKey = normalizeCompareTitle(fresh.title);
-          const prev = oldMap.get(normKey);
-          if (!prev) return fresh;
-          const preservedSelected = prev.selectedTimes.filter((t) => fresh.times.includes(t));
-          oldMap.delete(normKey);
-          return {
-            ...fresh,
-            enabled: prev.enabled,
-            selectedTimes: preservedSelected
-          };
-        });
-
-        // ユーザーが手動追加したカスタム演目もそのまま残す
-        oldMap.forEach((customShow) => {
-          merged.push(customShow);
-        });
-
-        state.date = newDate;
-        state.shows = deduplicateShows(merged);
-        commitUserChange(`📅 ${formatDisplayDate(newDate)} の公演スケジュールを反映しました（重複整理・ON/OFF維持）`);
-      }
-
       function inferCategoryFromTitle(title) {
         const t = String(title || '');
         if (t.includes('パレード')) return 'parade';
@@ -2027,7 +1958,6 @@
         return 'show';
       }
 
-      // ページ全文コピーに含まれる定型メニュー・フッター・見出しノイズを除外
       function isNoiseLine(line) {
         const noiseExact = new Set([
           '本文へ',
@@ -2087,7 +2017,6 @@
         return false;
       }
 
-      // 「10:2511:3013:05」のように空白なしで連結された時刻列も確実に抽出
       function extractTimesFromLine(line) {
         const found = [];
         const regex = /(?:^|[^\d:])([01]?\d|2[0-3]):([0-5]\d)(?=$|[^\d:])/g;
@@ -2156,7 +2085,6 @@
               times: matches
             };
           } else {
-            // 「休止中」など時刻がないステータス行は直前演目があれば確定して次へ
             if (/^(?:休止中|中止|案内終了)$/.test(line)) {
               pushCurrentIfValid();
               return;
@@ -2199,14 +2127,14 @@
         return parsedEntries;
       }
 
-      function applyImportedScheduleText(rawText, replaceUnlisted) {
+      // 取り込みスケジュールで演目リストを完全書き換え（replaceUnlisted = true が既定）
+      function applyImportedScheduleText(rawText, replaceAll = true) {
         const parsed = parseSchedulePasteText(rawText);
         if (parsed.length === 0) {
           showToast('⚠️ 演目名と時刻（例 14:00）を読み取れませんでした。テキストを確認してください。', 'warn');
           return;
         }
 
-        // 全文コピー内に「2026年11月25日」などの日付があれば自動で日付欄も合わせる
         const dateMatch = String(rawText || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
         if (dateMatch) {
           const y = dateMatch[1];
@@ -2215,7 +2143,6 @@
           state.date = `${y}-${m}-${d}`;
         }
 
-        // 「本日の営業時間 09:00〜21:00」などがあればオープン・クローズ時刻も反映
         const hoursMatch = String(rawText || '').match(/本日の営業時間\s*([01]?\d|2[0-3]):([0-5]\d)\s*[〜～\-–]\s*([01]?\d|2[0-3]):([0-5]\d)/);
         if (hoursMatch) {
           state.openTime = normalizeTimeHHMM(`${hoursMatch[1]}:${hoursMatch[2]}`, state.openTime);
@@ -2223,56 +2150,31 @@
         }
 
         const palette = ['rose', 'purple', 'amber', 'cyan', 'blue', 'emerald'];
-        const existingMap = new Map(state.shows.map((s) => [normalizeCompareTitle(s.title), s]));
-        const matchedExistingIds = new Set();
-        const nextShows = [];
-
-        parsed.forEach((entry, idx) => {
-          const normKey = normalizeCompareTitle(entry.title);
-          const existing = existingMap.get(normKey);
-
-          if (existing) {
-            matchedExistingIds.add(existing.id);
-            const preservedSelected = existing.selectedTimes.filter((t) => entry.times.includes(t));
-            nextShows.push({
-              ...existing,
-              title: entry.title,
-              category: entry.category || existing.category,
-              duration: entry.duration || existing.duration,
-              area: entry.area !== 'パーク内' ? entry.area : existing.area,
-              times: entry.times,
-              selectedTimes: preservedSelected
-            });
-          } else {
-            nextShows.push({
-              id: 'imported-' + Date.now() + '-' + idx,
-              title: entry.title,
-              category: entry.category,
-              duration: entry.duration,
-              area: entry.area,
-              color: palette[idx % palette.length],
-              enabled: shouldDefaultWatch(entry.title),
-              times: entry.times,
-              selectedTimes: []
-            });
-          }
-        });
-
-        if (!replaceUnlisted) {
-          state.shows.forEach((s) => {
-            if (!matchedExistingIds.has(s.id)) {
-              nextShows.push(s);
-            }
-          });
-        }
+        const nextShows = parsed.map((entry, idx) => ({
+          id: 'imported-' + state.date + '-' + idx + '-' + normalizeCompareTitle(entry.title).slice(0, 12),
+          title: entry.title,
+          category: entry.category,
+          duration: entry.duration,
+          area: entry.area,
+          color: palette[idx % palette.length],
+          enabled: shouldDefaultWatch(entry.title),
+          times: entry.times,
+          selectedTimes: []
+        }));
 
         state.shows = normalizeShows(nextShows);
         closeImportModal();
-        commitUserChange(`📥 ${parsed.length}演目のスケジュールを取り込みました！`);
+        commitUserChange(
+          replaceAll
+            ? `📥 ${parsed.length}演目のスケジュールに完全書き換えしました！`
+            : `📥 ${parsed.length}演目のスケジュールを反映しました！`
+        );
       }
 
       function openImportModal() {
         const overlay = document.getElementById('import-modal-overlay');
+        const replaceCheckbox = document.getElementById('input-import-replace-all');
+        if (replaceCheckbox) replaceCheckbox.checked = true;
         overlay.classList.remove('hidden');
         overlay.classList.add('flex');
       }
@@ -2283,7 +2185,6 @@
         overlay.classList.remove('flex');
       }
 
-      // === イベントリスナー登録 ===
       function bindEvents() {
         document.getElementById('schedule-date').addEventListener('change', updateScheduleByDate);
         document.getElementById('btn-add-show').addEventListener('click', () => openEditModal(null));
@@ -2292,14 +2193,15 @@
         document.getElementById('btn-sync-modal').addEventListener('click', openSyncModal);
         document.getElementById('badge-room-id').addEventListener('click', openSyncModal);
 
-        // 貼り付け取り込みモーダル操作
         document.getElementById('import-modal-close').addEventListener('click', closeImportModal);
         document.getElementById('import-modal-cancel').addEventListener('click', closeImportModal);
         document.getElementById('import-modal-overlay').addEventListener('click', (e) => {
           if (e.target.id === 'import-modal-overlay') closeImportModal();
         });
+
         document.getElementById('btn-import-official-preset').addEventListener('click', () => {
           document.getElementById('input-import-text').value = [
+            '本日の営業時間 09:00〜21:00',
             '営業時間・スケジュール',
             '2026年11月25日',
             '時刻表',
@@ -2341,6 +2243,7 @@
             '11:1513:0014:4516:3018:1520:00'
           ].join('\n');
         });
+
         document.getElementById('btn-import-sample').addEventListener('click', () => {
           document.getElementById('input-import-text').value = [
             'パワー・オブ・ロック ～ホリデー・ロッキン！～（約25分・ニューヨーク・エリア）',
@@ -2353,8 +2256,10 @@
             '14:00'
           ].join('\n');
         });
+
         document.getElementById('btn-import-usj-1125').addEventListener('click', () => {
           document.getElementById('input-import-text').value = [
+            '本日の営業時間 09:00〜21:00',
             '2026年11月25日',
             '',
             'ウィキッド ～オズの魔女たち～',
@@ -2409,18 +2314,24 @@
             '11:15 / 13:00 / 14:45 / 16:30 / 18:15 / 20:00'
           ].join('\n');
         });
+
         document.getElementById('import-schedule-form').addEventListener('submit', (e) => {
           e.preventDefault();
           const rawText = document.getElementById('input-import-text').value;
           const replaceAll = document.getElementById('input-import-replace-all').checked;
-          const safeReplaceUnlisted = replaceAll && parseSchedulePasteText(rawText).length >= 3;
-          if (replaceAll && !safeReplaceUnlisted) {
-            showToast('⚠️ 読み取れた演目が少ないため、既存演目は保護して反映しました');
+          const parsedCount = parseSchedulePasteText(rawText).length;
+          if (parsedCount === 0) {
+            showToast('⚠️ 演目名と時刻を読み取れませんでした。時刻表部分がコピーできているか確認してください。', 'warn');
+            return;
           }
-          applyImportedScheduleText(rawText, safeReplaceUnlisted);
+          // 2件以下しか読み取れなかった場合はコピー途切れの可能性が高いため、うっかり全消去しないよう安全ガード
+          const safeReplaceAll = replaceAll && parsedCount >= 3;
+          if (replaceAll && !safeReplaceAll) {
+            showToast('⚠️ 読み取れた演目が少ない（' + parsedCount + '件）ため、既存リストを残して反映しました');
+          }
+          applyImportedScheduleText(rawText, safeReplaceAll);
         });
 
-        // 誤タップ防止の2段階リセット
         const resetBtn = document.getElementById('btn-reset-default');
         resetBtn.addEventListener('click', () => {
           if (!state.resetConfirmTimer) {
@@ -2444,7 +2355,6 @@
           commitUserChange('↺ 初期スケジュールに戻しました');
         });
 
-        // 重複ジャンプ＆自動調整
         document.getElementById('overlap-banner-jump').addEventListener('click', () => {
           const { conflictKeys } = getSelectedSlotsWithConflicts();
           const firstKey = Array.from(conflictKeys)[0];
@@ -2455,7 +2365,6 @@
         });
         document.getElementById('btn-auto-resolve').addEventListener('click', autoResolveConflicts);
 
-        // モバイルタブ切替
         function setMobileTab(tab) {
           state.mobileTab = tab;
           const panelList = document.getElementById('panel-list');
@@ -2482,7 +2391,6 @@
         document.getElementById('tab-list').addEventListener('click', () => setMobileTab('list'));
         document.getElementById('tab-calendar').addEventListener('click', () => setMobileTab('calendar'));
 
-        // カテゴリ絞り込み
         document.querySelectorAll('.cat-btn').forEach((btn) => {
           btn.addEventListener('click', () => {
             state.activeCategory = btn.dataset.cat;
@@ -2494,7 +2402,6 @@
         document.getElementById('btn-all-on').addEventListener('click', () => setBulkEnabled(true));
         document.getElementById('btn-all-off').addEventListener('click', () => setBulkEnabled(false));
 
-        // カレンダー表示切替
         document.getElementById('btn-toggle-lanes').addEventListener('click', () => {
           state.twoLaneMode = !state.twoLaneMode;
           savePrefs();
@@ -2516,7 +2423,6 @@
           renderAll();
         });
 
-        // 編集モーダル操作
         document.getElementById('modal-close').addEventListener('click', closeEditModal);
         document.getElementById('modal-cancel').addEventListener('click', closeEditModal);
         document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -2584,7 +2490,6 @@
           commitUserChange(`🗑️ 「${target.title}」を削除しました`);
         });
 
-        // 同期モーダル操作
         document.getElementById('sync-modal-close').addEventListener('click', closeSyncModal);
         document.getElementById('sync-modal-overlay').addEventListener('click', (e) => {
           if (e.target.id === 'sync-modal-overlay') closeSyncModal();
@@ -2629,13 +2534,12 @@
         });
       }
 
-      // 起動直後にローカル保存データを0msで描画
       bindEvents();
       renderAll();
     })();
   </script>
 
-  <!-- Firebase リアルタイム同期モジュール（getDoc先行確認＋プレビュー環境セーフガード付き） -->
+  <!-- Firebase リアルタイム同期モジュール -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -2662,7 +2566,6 @@
     let writeTimer = null;
     let lastWriteToken = '';
 
-    // Geminiプレビュー等のサンドボックス環境かどうかを判定（APIキーのドメイン制限によるエラー防止）
     function isPreviewSandboxHost() {
       const host = (window.location.hostname || '').toLowerCase();
       return (
@@ -2796,7 +2699,6 @@
       const docRef = doc(db, 'artifacts', APP_NAMESPACE, 'public', 'data', 'usj_show_rooms', roomId);
 
       try {
-        // リロード時に初期状態でクラウドを上書きしないよう、必ず最初にサーバー上のデータをgetDocで確認する
         const initialSnap = await getDoc(docRef);
         const localData = window.getExportableScheduleData ? window.getExportableScheduleData() : null;
 
@@ -2857,7 +2759,6 @@
     };
 
     async function initFirebaseSync() {
-      // Geminiエディタ内のプレビュー画面ではAPIキーのセキュリティ制限が働くため、通信せず端末保存モードへ切り替える
       if (isPreviewSandboxHost()) {
         updateSyncStatusUI(
           'offline',
