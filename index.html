@@ -111,6 +111,11 @@
             ＋
           </button>
 
+          <button id="btn-import-schedule" type="button" title="公式スケジュール等のテキストを貼り付けて取り込む"
+            class="px-2 py-1 rounded-lg bg-sky-500/25 hover:bg-sky-500/40 active:scale-95 text-sky-100 text-[11px] sm:text-xs font-bold border border-sky-300/40 transition cursor-pointer">
+            📥 取込
+          </button>
+
           <button id="btn-copy-plan" type="button" title="LINE共有用テキストをコピー"
             class="px-2 sm:px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-[11px] sm:text-xs font-extrabold shadow-sm transition flex items-center gap-1 cursor-pointer">
             <span>📋</span>
@@ -450,6 +455,53 @@
 
   <!-- トースト通知 -->
   <div id="toast-container" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-max max-w-[92vw]"></div>
+
+  <!-- スケジュール貼り付け取り込みモーダル -->
+  <div id="import-modal-overlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 bg-gradient-to-r from-sky-900 to-indigo-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">📥</span>
+          <h3 class="text-sm sm:text-base font-extrabold">スケジュールテキスト貼り付け取り込み</h3>
+        </div>
+        <button id="import-modal-close" type="button" class="text-sky-200 hover:text-white text-lg font-bold px-2 cursor-pointer">✕</button>
+      </div>
+
+      <form id="import-schedule-form" class="p-4 sm:p-5 flex flex-col gap-3.5 max-h-[82dvh] overflow-y-auto">
+        <div class="bg-sky-50 border border-sky-200 rounded-xl p-3 text-[11px] text-sky-950 leading-relaxed">
+          USJ公式スケジュールページを<strong>そのまま全選択コピー（Ctrl+A → Ctrl+C）して貼り付け</strong>てもOKです。くっついた時刻（<code>10:2511:30</code>）や日付（<code>2026年11月25日</code>）も自動判別し、既存のON/OFF状態や決定済みの時間はできるだけ保持します。
+        </div>
+
+        <div>
+          <label for="input-import-text" class="block text-xs font-extrabold text-slate-700 mb-1">貼り付けテキスト（公式ページ全文コピー可）</label>
+          <textarea id="input-import-text" rows="8" required
+            placeholder="公式スケジュールページを全選択コピーしたものをそのまま貼り付けてください。&#10;&#10;例：&#10;ウィキッド ～オズの魔女たち～&#10;10:2511:3013:0515:4517:30&#10;NO LIMIT! パレード ～Discover U!!! バージョン～&#10;14:00"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-sky-600 custom-scrollbar"></textarea>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 text-xs">
+          <label class="inline-flex items-center gap-1.5 font-bold text-slate-700 cursor-pointer">
+            <input id="input-import-replace-all" type="checkbox" checked class="rounded border-slate-300 text-sky-700 focus:ring-sky-600" />
+            <span>取り込みにない既存演目はリストから外す</span>
+          </label>
+          <button id="btn-import-sample" type="button" class="text-[11px] font-bold text-sky-700 hover:underline cursor-pointer shrink-0">
+            サンプル挿入
+          </button>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <button id="import-modal-cancel" type="button"
+            class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold cursor-pointer">
+            キャンセル
+          </button>
+          <button type="submit"
+            class="px-5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-xs font-extrabold shadow-sm cursor-pointer">
+            解析して反映する
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- メインアプリケーションロジック（同期・ローカル永続化対応） -->
   <script>
@@ -1795,38 +1847,305 @@
         overlay.classList.remove('flex');
       }
 
-      function switchRoom(newRoomRaw) {
-        const safeRoom = sanitizeRoomId(newRoomRaw);
-        state.roomId = safeRoom;
-        updateUrlRoomHash(safeRoom);
-        savePrefs();
+      // === 貼り付けテキストの解析・取り込み ===
+      function normalizeCompareTitle(title) {
+        return String(title || '')
+          .replace(/[～〜~・･\s]+/g, '')
+          .replace(/[！!？?]+$/g, '')
+          .toLowerCase();
+      }
 
-        const localForNewRoom = loadLocalRoomData(safeRoom);
-        if (localForNewRoom) {
-          state.date = localForNewRoom.date;
-          state.shows = localForNewRoom.shows;
-          state.updatedAt = localForNewRoom.updatedAt;
-          state.dirtyOffline = localForNewRoom.dirtyOffline;
-        } else {
-          state.shows = createDefaultShows(state.date);
-          state.updatedAt = 0;
-          state.dirtyOffline = false;
+      function inferCategoryFromTitle(title) {
+        const t = String(title || '');
+        if (t.includes('パレード')) return 'parade';
+        if (t.includes('グリーティング') || t.includes('ミート') || t.includes('エンカウンター') || t.includes('レッスン')) {
+          return 'greeting';
         }
-        renderAll();
+        return 'show';
+      }
 
-        if (typeof window.switchCloudRoom === 'function') {
-          window.switchCloudRoom(safeRoom);
+      // ページ全文コピーに含まれる定型メニュー・フッター・見出しノイズを除外
+      function isNoiseLine(line) {
+        const noiseExact = new Set([
+          '本文へ',
+          'ユニバーサル・スタジオ・ジャパン',
+          'チケット',
+          'ショー＆アトラクション・スケジュール',
+          'ナビゲーション',
+          '営業時間・スケジュール',
+          '本日ご来場の皆さまへ',
+          '時刻表',
+          '運行時間',
+          '休止情報',
+          'ユニバーサル・スタジオ・ジャパン公式アプリの画面',
+          'ユニバーサル・スタジオ・ジャパン公式アプリ',
+          'iPhone・Android対応。',
+          '今日のアトラクションの待ち時間をチェック！',
+          'Universal Studios Japan Logo',
+          'イベントを探す',
+          'アトラクションを探す',
+          'フード＆レストラン',
+          'グッズ＆ショップ',
+          'ユニバーサル・トラベル',
+          'パートナーホテル',
+          'WEBチケットストア',
+          'Clubユニバーサル',
+          '団体・企業向けプログラム',
+          '学校団体向けプログラム',
+          'マーケティング・パートナーのご紹介',
+          '公式ソーシャルメディアアカウント一覧',
+          '企業情報',
+          '採用情報',
+          'クルー募集',
+          'エンターテイナー募集',
+          'よくあるご質問',
+          'お問合わせ',
+          'CSRへの取組み',
+          '公式アプリダウンロード',
+          'App Store',
+          'Play Store',
+          '日本語',
+          '著作権と商標',
+          '使用条件',
+          '交通アクセス',
+          '施設案内・安全管理',
+          'プライバシーポリシー',
+          'クッキーに関する通知',
+          'サイトマップ',
+          'TM & © Universal Studios. All rights reserved.',
+          '※写真はイメージです',
+          '※本サイト上の画像や動画には、ご来場時点での運営策や衛生強化対策ガイドラインに準じていないものも含まれています'
+        ]);
+        if (noiseExact.has(line)) return true;
+        if (/^本日の営業時間\s*/.test(line)) return true;
+        if (/^\d{4}年\d{1,2}月\d{1,2}日$/.test(line)) return true;
+        if (/^更新日[：:]/.test(line)) return true;
+        if (/^天候などの理由により/.test(line)) return true;
+        return false;
+      }
+
+      // 「10:2511:3013:05」のように空白なしで連結された時刻列も確実に抽出
+      function extractTimesFromLine(line) {
+        const found = [];
+        const regex = /(?:^|[^\d:])([01]?\d|2[0-3]):([0-5]\d)(?=$|[^\d:])/g;
+        let match;
+        while ((match = regex.exec(line)) !== null) {
+          const hh = String(parseInt(match[1], 10)).padStart(2, '0');
+          const mm = String(parseInt(match[2], 10)).padStart(2, '0');
+          found.push(`${hh}:${mm}`);
         }
-        showToast(`🔑 合言葉「${safeRoom}」に切り替えました`);
+        return found;
+      }
+
+      function parseSchedulePasteText(rawText) {
+        const lines = String(rawText || '')
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter((l) => l.length > 0 && !isNoiseLine(l));
+
+        const durationRegex = /(?:約\s*)?(\d{1,3})\s*分/;
+        const areaRegex = /(?:エリア|パーク|ワールド|ルート|ホール|シアター|ステージ)[^\s）\)]*/;
+
+        const parsedEntries = [];
+        let current = null;
+
+        function pushCurrentIfValid() {
+          if (!current) return;
+          const cleanTitle = current.title.replace(/^[\-\*・■◆▶●]+\s*/, '').trim();
+          if (cleanTitle && current.times.length > 0) {
+            parsedEntries.push({
+              title: cleanTitle,
+              category: current.category || inferCategoryFromTitle(cleanTitle),
+              duration: current.duration || 25,
+              area: current.area || 'パーク内',
+              times: Array.from(new Set(current.times)).sort()
+            });
+          }
+          current = null;
+        }
+
+        lines.forEach((line) => {
+          const matches = extractTimesFromLine(line);
+          const lineWithoutTimes = line
+            .replace(/(?:^|[^\d:])([01]?\d|2[0-3]):([0-5]\d)(?=$|[^\d:])/g, ' ')
+            .replace(/[\/／|｜・,、]+/g, ' ')
+            .trim();
+          const hasMeaningfulText = lineWithoutTimes.replace(/^(?:約\s*\d+\s*分|公演時間|開始時刻|時間|所要時間)[:：\s]*/i, '').length >= 2;
+
+          if (matches.length > 0 && !hasMeaningfulText) {
+            if (current) {
+              current.times.push(...matches);
+            }
+          } else if (matches.length > 0 && hasMeaningfulText) {
+            pushCurrentIfValid();
+            const durMatch = lineWithoutTimes.match(durationRegex);
+            const areaMatch = lineWithoutTimes.match(areaRegex);
+            const cleanedTitle = lineWithoutTimes
+              .replace(/[（\(][^）\)]*(?:分|エリア|パーク|ワールド|ルート)[^）\)]*[）\)]/g, ' ')
+              .replace(/\s{2,}/g, ' ')
+              .trim();
+
+            current = {
+              title: cleanedTitle || lineWithoutTimes,
+              category: inferCategoryFromTitle(cleanedTitle || lineWithoutTimes),
+              duration: durMatch ? Math.max(5, Math.min(180, parseInt(durMatch[1], 10))) : 25,
+              area: areaMatch ? areaMatch[0] : 'パーク内',
+              times: matches
+            };
+          } else {
+            // 「休止中」など時刻がないステータス行は直前演目があれば確定して次へ
+            if (/^(?:休止中|中止|案内終了)$/.test(line)) {
+              pushCurrentIfValid();
+              return;
+            }
+
+            const durOnlyMatch = line.match(/^(?:所要時間|時間)[:：\s]*(?:約\s*)?(\d{1,3})\s*分$/);
+            const areaOnlyMatch = line.match(/^(?:開催エリア|エリア|場所)[:：\s]*(.+)$/);
+
+            if (current && durOnlyMatch) {
+              current.duration = Math.max(5, Math.min(180, parseInt(durOnlyMatch[1], 10)));
+            } else if (current && areaOnlyMatch) {
+              current.area = areaOnlyMatch[1].trim();
+            } else if (current && current.times.length === 0 && current.title.length <= 45) {
+              current.title = `${current.title} ${line}`.trim();
+              const durMatch = line.match(durationRegex);
+              if (durMatch) {
+                current.duration = Math.max(5, Math.min(180, parseInt(durMatch[1], 10)));
+              }
+            } else {
+              pushCurrentIfValid();
+              const durMatch = line.match(durationRegex);
+              const areaMatch = line.match(areaRegex);
+              const cleanedTitle = line
+                .replace(/[（\(][^）\)]*(?:分|エリア|パーク|ワールド|ルート)[^）\)]*[）\)]/g, ' ')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+
+              current = {
+                title: cleanedTitle || line,
+                category: inferCategoryFromTitle(cleanedTitle || line),
+                duration: durMatch ? Math.max(5, Math.min(180, parseInt(durMatch[1], 10))) : 25,
+                area: areaMatch ? areaMatch[0] : 'パーク内',
+                times: []
+              };
+            }
+          }
+        });
+
+        pushCurrentIfValid();
+        return parsedEntries;
+      }
+
+      function applyImportedScheduleText(rawText, replaceUnlisted) {
+        const parsed = parseSchedulePasteText(rawText);
+        if (parsed.length === 0) {
+          showToast('⚠️ 演目名と時刻（例 14:00）を読み取れませんでした。テキストを確認してください。', 'warn');
+          return;
+        }
+
+        // 全文コピー内に「2026年11月25日」などの日付があれば自動で日付欄も合わせる
+        const dateMatch = String(rawText || '').match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+        if (dateMatch) {
+          const y = dateMatch[1];
+          const m = String(parseInt(dateMatch[2], 10)).padStart(2, '0');
+          const d = String(parseInt(dateMatch[3], 10)).padStart(2, '0');
+          state.date = `${y}-${m}-${d}`;
+        }
+
+        const palette = ['rose', 'purple', 'amber', 'cyan', 'blue', 'emerald'];
+        const existingMap = new Map(state.shows.map((s) => [normalizeCompareTitle(s.title), s]));
+        const matchedExistingIds = new Set();
+        const nextShows = [];
+
+        parsed.forEach((entry, idx) => {
+          const normKey = normalizeCompareTitle(entry.title);
+          const existing = existingMap.get(normKey);
+
+          if (existing) {
+            matchedExistingIds.add(existing.id);
+            const preservedSelected = existing.selectedTimes.filter((t) => entry.times.includes(t));
+            nextShows.push({
+              ...existing,
+              title: entry.title,
+              category: entry.category || existing.category,
+              duration: entry.duration || existing.duration,
+              area: entry.area !== 'パーク内' ? entry.area : existing.area,
+              times: entry.times,
+              selectedTimes: preservedSelected
+            });
+          } else {
+            nextShows.push({
+              id: 'imported-' + Date.now() + '-' + idx,
+              title: entry.title,
+              category: entry.category,
+              duration: entry.duration,
+              area: entry.area,
+              color: palette[idx % palette.length],
+              enabled: false,
+              times: entry.times,
+              selectedTimes: []
+            });
+          }
+        });
+
+        if (!replaceUnlisted) {
+          state.shows.forEach((s) => {
+            if (!matchedExistingIds.has(s.id)) {
+              nextShows.push(s);
+            }
+          });
+        }
+
+        state.shows = normalizeShows(nextShows);
+        closeImportModal();
+        commitUserChange(`📥 ${parsed.length}演目のスケジュールを取り込みました！`);
+      }
+
+      function openImportModal() {
+        const overlay = document.getElementById('import-modal-overlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+      }
+
+      function closeImportModal() {
+        const overlay = document.getElementById('import-modal-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
       }
 
       // === イベントリスナー登録 ===
       function bindEvents() {
         document.getElementById('btn-fetch-schedule').addEventListener('click', updateScheduleByDate);
         document.getElementById('btn-add-show').addEventListener('click', () => openEditModal(null));
+        document.getElementById('btn-import-schedule').addEventListener('click', openImportModal);
         document.getElementById('btn-copy-plan').addEventListener('click', copyPlanText);
         document.getElementById('btn-sync-modal').addEventListener('click', openSyncModal);
         document.getElementById('badge-room-id').addEventListener('click', openSyncModal);
+
+        // 貼り付け取り込みモーダル操作
+        document.getElementById('import-modal-close').addEventListener('click', closeImportModal);
+        document.getElementById('import-modal-cancel').addEventListener('click', closeImportModal);
+        document.getElementById('import-modal-overlay').addEventListener('click', (e) => {
+          if (e.target.id === 'import-modal-overlay') closeImportModal();
+        });
+        document.getElementById('btn-import-sample').addEventListener('click', () => {
+          document.getElementById('input-import-text').value = [
+            'パワー・オブ・ロック ～ホリデー・ロッキン！～（約25分・ニューヨーク・エリア）',
+            '09:25 / 10:55 / 12:35 / 15:05 / 16:45',
+            '',
+            'クロミ・ライブ ～Discover Me Discover U!!!～',
+            '09:50 / 11:25 / 13:00 / 15:15',
+            '',
+            'NO LIMIT! パレード ～Discover U!!! バージョン～（パレードルート全域）',
+            '14:00'
+          ].join('\n');
+        });
+        document.getElementById('import-schedule-form').addEventListener('submit', (e) => {
+          e.preventDefault();
+          const rawText = document.getElementById('input-import-text').value;
+          const replaceAll = document.getElementById('input-import-replace-all').checked;
+          applyImportedScheduleText(rawText, replaceAll);
+        });
 
         // 誤タップ防止の2段階リセット
         const resetBtn = document.getElementById('btn-reset-default');
@@ -2081,25 +2400,28 @@
     }
 
     function diagnoseFirebaseError(err) {
-      const msg = String((err && (err.code || err.message)) || err || '');
-      if (msg.includes('operation-not-allowed') || msg.includes('ADMIN_ONLY_OPERATION')) {
-        return 'Firebaseコンソールの「Authentication → ログイン方法 → 匿名」を「有効」にして保存してください。';
+      const rawCode = (err && err.code) ? String(err.code) : '';
+      const rawMsg = (err && err.message) ? String(err.message) : String(err || '');
+      const combined = `${rawCode} ${rawMsg}`;
+      const fullUrlWithPath = `${window.location.origin}${window.location.pathname}`;
+
+      if (combined.includes('operation-not-allowed') || combined.includes('ADMIN_ONLY_OPERATION')) {
+        return `Firebaseコンソールの「Authentication → ログイン方法 → 匿名」を「有効」にして保存してください。（詳細: ${rawCode || rawMsg}）`;
       }
-      if (msg.includes('unauthorized-domain')) {
-        return `Firebaseコンソールの「Authentication → 設定 → 承認済みドメイン」に「${window.location.hostname}」を追加してください。`;
+      if (combined.includes('unauthorized-domain')) {
+        return `Firebaseコンソールの「Authentication → 設定 → 承認済みドメイン」に「${window.location.hostname}」を追加してください。（詳細: ${rawCode || rawMsg}）`;
       }
       if (
-        msg.includes('requests-from-referer') ||
-        msg.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
-        msg.includes('referer') ||
-        msg.includes('403')
+        combined.includes('requests-from-referer') ||
+        combined.includes('API_KEY_HTTP_REFERRER_BLOCKED') ||
+        combined.includes('referer')
       ) {
-        return `このURL（${window.location.origin}）はAPIキーの許可リスト外です。公開サイト（https://main580.github.io/usj-schedule/）で開くか、独自ドメインを使う場合はGoogle Cloud認証情報のウェブサイト制限に「${window.location.origin}/*」を追加してください。`;
+        return `アクセス元URL（${fullUrlWithPath}）がAPIキーの制限に引っかかっています。Google Cloud認証情報のウェブサイト制限に「${window.location.origin}/*」と「${fullUrlWithPath}*」の両方が入っているか確認してください。（詳細: ${rawCode || rawMsg}）`;
       }
-      if (msg.includes('permission-denied')) {
-        return 'Firestoreの「ルール」タブで公開ボタンを押したか確認してください。';
+      if (combined.includes('permission-denied')) {
+        return `Firestoreの「ルール」タブで公開ボタンを押したか確認してください。（詳細: ${rawCode || rawMsg}）`;
       }
-      return `通信詳細: ${msg}`;
+      return `通信詳細: ${rawCode ? rawCode + ' / ' : ''}${rawMsg}`;
     }
 
     function updateSyncStatusUI(status, message, errorHint = '') {
