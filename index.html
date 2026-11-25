@@ -98,7 +98,7 @@
         <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <div class="flex items-center bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 gap-1">
             <input id="schedule-date" type="date" value="2026-11-25" title="対象日を選択"
-              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[108px] sm:w-auto" />
+              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[104px] sm:w-auto" />
           </div>
 
           <button id="btn-add-show" type="button" title="演目・予定を追加"
@@ -1680,7 +1680,7 @@
         timeAxis.className = 'w-12 sm:w-14 shrink-0 relative border-r border-slate-200 bg-slate-50/50 select-none';
 
         const lanesArea = document.createElement('div');
-        lanesArea.className = 'flex-1 relative flex min-w-[460px] sm:min-w-0';
+        lanesArea.className = 'flex-1 min-w-0 relative flex';
 
         for (let m = calStartMin; m <= calEndMin; m += 15) {
           const topPx = (m - calStartMin) * pxPerMin;
