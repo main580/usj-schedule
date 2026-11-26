@@ -81,56 +81,56 @@
 
   <!-- スリムトップヘッダー -->
   <header class="bg-gradient-to-r from-indigo-950 via-blue-900 to-sky-900 text-white shadow-md sticky top-0 z-40">
-    <div class="max-w-[1480px] mx-auto px-2.5 sm:px-6 py-1.5">
-      <div class="flex items-center justify-between gap-1.5">
+    <div class="max-w-[1480px] mx-auto px-2 sm:px-6 py-1.5">
+      <div class="flex items-center justify-between gap-1">
         <!-- アプリタイトル -->
-        <div class="flex items-center gap-1.5 min-w-0">
-          <div class="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm shrink-0 text-slate-950 font-extrabold text-xs sm:text-base">
+        <div class="flex items-center gap-1 min-w-0">
+          <div class="w-5 h-5 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm shrink-0 text-slate-950 font-extrabold text-[11px] sm:text-base">
             🌐
           </div>
-          <h1 class="text-xs sm:text-base font-extrabold tracking-tight truncate">
-            <span class="sm:hidden">USJ ショー計画</span>
+          <h1 class="text-[11px] sm:text-base font-extrabold tracking-tight truncate">
+            <span class="sm:hidden">USJ計画</span>
             <span class="hidden sm:inline">USJ ショースケジュール＆鑑賞プランナー</span>
           </h1>
         </div>
 
         <!-- 日付選択＆コンパクトアクション群 -->
         <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <div class="flex items-center bg-white/10 border border-white/20 rounded-lg px-1.5 py-0.5 gap-1">
+          <div class="flex items-center bg-white/10 border border-white/20 rounded-md px-1 py-0.5">
             <input id="schedule-date" type="date" value="2026-11-25" title="対象日を選択"
-              class="bg-transparent text-white text-[11px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[104px] sm:w-auto" />
+              class="bg-transparent text-white text-[10px] sm:text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] w-[94px] sm:w-auto" />
           </div>
 
           <button id="btn-add-show" type="button" title="演目・予定を追加"
-            class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[11px] sm:text-xs font-bold border border-white/15 transition cursor-pointer">
+            class="px-1.5 sm:px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 active:scale-95 text-white text-[10px] sm:text-xs font-bold border border-white/15 transition cursor-pointer">
             ＋
           </button>
 
           <button id="btn-import-schedule" type="button" title="公式スケジュール等のテキストを貼り付けて取り込む"
-            class="px-2 py-1 rounded-lg bg-sky-500/25 hover:bg-sky-500/40 active:scale-95 text-sky-100 text-[11px] sm:text-xs font-bold border border-sky-300/40 transition cursor-pointer">
+            class="px-1.5 sm:px-2 py-1 rounded-md bg-sky-500/25 hover:bg-sky-500/40 active:scale-95 text-sky-100 text-[10px] sm:text-xs font-bold border border-sky-300/40 transition cursor-pointer">
             📥 取込
           </button>
 
           <button id="btn-copy-plan" type="button" title="LINE共有用テキストをコピー"
-            class="px-2 sm:px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-[11px] sm:text-xs font-extrabold shadow-sm transition flex items-center gap-1 cursor-pointer">
+            class="px-1.5 sm:px-3 py-1 rounded-md bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 text-[10px] sm:text-xs font-extrabold shadow-sm transition flex items-center gap-0.5 cursor-pointer">
             <span>📋</span>
             <span>コピー</span>
           </button>
 
           <button id="btn-sync-modal" type="button" title="家族・身内とリアルタイム同期"
-            class="px-2 sm:px-2.5 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/35 active:scale-95 text-emerald-100 text-[11px] sm:text-xs font-extrabold border border-emerald-400/50 transition flex items-center gap-1 cursor-pointer">
-            <span id="sync-status-dot" class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span>
+            class="px-1.5 sm:px-2.5 py-1 rounded-md bg-emerald-500/25 hover:bg-emerald-500/35 active:scale-95 text-emerald-100 text-[10px] sm:text-xs font-extrabold border border-emerald-400/50 transition flex items-center gap-1 cursor-pointer">
+            <span id="sync-status-dot" class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-amber-400 inline-block"></span>
             <span id="sync-btn-label">接続中</span>
           </button>
 
           <!-- 決定済み合計公演数バッジ -->
           <span id="header-run-count-badge" title="決定している合計公演数"
-            class="inline-flex items-center justify-center min-w-[26px] h-[24px] px-1.5 rounded-full bg-amber-300 text-slate-950 text-[10px] sm:text-[11px] font-extrabold shadow-sm border border-amber-400 shrink-0">
+            class="inline-flex items-center justify-center h-[22px] sm:h-[24px] px-1.5 rounded-full bg-amber-300 text-slate-950 text-[10px] sm:text-[11px] font-extrabold shadow-sm border border-amber-400 shrink-0">
             0回
           </span>
 
           <button id="btn-reset-default" type="button" title="初期データに戻す"
-            class="px-1.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:scale-95 text-sky-200 hover:text-white text-[11px] border border-white/15 transition cursor-pointer">
+            class="px-1.5 py-1 rounded-md bg-white/10 hover:bg-white/20 active:scale-95 text-sky-200 hover:text-white text-[10px] sm:text-[11px] border border-white/15 transition cursor-pointer">
             ↺
           </button>
         </div>
@@ -138,9 +138,9 @@
 
       <!-- 1行サマリー＆重複警告バー -->
       <div class="mt-1 pt-1 border-t border-white/15 flex items-center justify-between gap-1 text-[10px] sm:text-xs overflow-x-auto">
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <button id="badge-room-id" type="button" title="タップして合言葉を確認・変更"
-            class="inline-flex items-center gap-1 bg-indigo-500/30 hover:bg-indigo-500/45 border border-indigo-300/40 px-1.5 py-0.5 rounded text-indigo-100 font-bold cursor-pointer">
+            class="inline-flex items-center gap-0.5 bg-indigo-500/30 hover:bg-indigo-500/45 border border-indigo-300/40 px-1.5 py-0.5 rounded text-indigo-100 font-bold cursor-pointer">
             <span>🔑</span>
             <span id="header-room-code">USJ-1123</span>
           </button>
@@ -148,7 +148,7 @@
             <strong id="summary-show-count" class="text-white">0演目</strong>/<strong id="summary-slot-count" class="text-amber-300">0公演</strong>
           </span>
           <span id="summary-park-hours" class="bg-sky-400/20 border border-sky-300/35 px-1.5 py-0.5 rounded text-sky-100 font-bold">
-            パーク <span id="park-hours-text">09:00〜21:00</span>
+            <span id="park-hours-text">09:00〜21:00</span>
           </span>
           <span id="summary-time-range" class="hidden bg-white/10 px-1.5 py-0.5 rounded text-sky-100 font-semibold">
             🕒 <span id="summary-time-text">--:-- ～ --:--</span>
@@ -158,7 +158,7 @@
           </span>
         </div>
 
-        <div class="flex items-center gap-1.5 shrink-0">
+        <div class="flex items-center gap-1 shrink-0">
           <span id="no-overlap-badge" class="bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 px-1.5 py-0.5 rounded font-bold">
             ✓ 重複なし
           </span>
@@ -177,7 +177,7 @@
   </header>
 
   <!-- モバイル専用：リスト／カレンダー切替タブバー -->
-  <div class="lg:hidden bg-white border-b border-slate-200 px-2.5 py-1.5 sticky top-[62px] z-30">
+  <div class="lg:hidden bg-white border-b border-slate-200 px-2 py-1 sticky top-[58px] z-30">
     <div class="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg">
       <button id="tab-list" type="button"
         class="py-1 px-2 rounded-md text-[11px] font-bold transition text-slate-600 hover:text-slate-900 cursor-pointer">
@@ -191,27 +191,27 @@
   </div>
 
   <!-- メイン2ペインワークスペース -->
-  <main class="flex-1 max-w-[1480px] w-full mx-auto px-2 sm:px-6 py-2 sm:py-4 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-start">
+  <main class="flex-1 max-w-[1480px] w-full mx-auto px-1.5 sm:px-6 py-1.5 sm:py-4 grid grid-cols-1 lg:grid-cols-12 gap-2.5 sm:gap-4 items-start">
 
     <!-- 左ペイン：演目リスト（左：見るON ／ 右：見ないOFF） -->
-    <section id="panel-list" class="hidden lg:flex lg:col-span-5 flex-col gap-2.5 bg-white rounded-2xl p-2.5 sm:p-3.5 shadow-sm border border-slate-200/80">
+    <section id="panel-list" class="hidden lg:flex lg:col-span-5 flex-col gap-2 bg-white rounded-xl sm:rounded-2xl p-2 sm:p-3.5 shadow-sm border border-slate-200/80">
       <!-- カテゴリ絞り込み＆一括操作 -->
       <div class="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-slate-100">
         <div id="category-filters" class="flex flex-wrap items-center gap-1">
           <button type="button" data-cat="all"
-            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-900 text-white shadow-sm transition cursor-pointer">
+            class="cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-bold bg-blue-900 text-white shadow-sm transition cursor-pointer">
             すべて
           </button>
           <button type="button" data-cat="show"
-            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            class="cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
             🎪 ショー
           </button>
           <button type="button" data-cat="parade"
-            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            class="cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
             🎉 パレード
           </button>
           <button type="button" data-cat="greeting"
-            class="cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
+            class="cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer">
             💛 グリーティング
           </button>
         </div>
@@ -229,7 +229,7 @@
       </div>
 
       <!-- 2列分割リスト（左：見るON ／ 右：見ないOFF） -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <!-- 左列：見る（ON） -->
         <div class="bg-emerald-50/70 rounded-xl p-2 border border-emerald-200/80 flex flex-col gap-2">
           <div class="flex items-center justify-between px-1">
@@ -251,21 +251,21 @@
     </section>
 
     <!-- 右ペイン：時間軸スケジュールカレンダー -->
-    <section id="panel-calendar" class="flex lg:col-span-7 flex-col bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden isolate">
+    <section id="panel-calendar" class="flex lg:col-span-7 flex-col bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden isolate">
       <!-- カレンダー上部コントロールバー -->
-      <div class="px-2.5 sm:px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-1.5">
-        <div class="flex items-center gap-1.5">
+      <div class="px-2 sm:px-4 py-1.5 sm:py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-1">
+        <div class="flex items-center gap-1">
           <button id="btn-toggle-lanes" type="button"
-            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[11px] font-extrabold shadow-sm transition cursor-pointer">
+            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[10px] sm:text-[11px] font-extrabold shadow-sm transition cursor-pointer">
             ✅｜🙈 2列比較中
           </button>
           <button id="btn-zoom-scale" type="button"
-            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[11px] font-extrabold shadow-sm transition cursor-pointer">
+            class="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-[10px] sm:text-[11px] font-extrabold shadow-sm transition cursor-pointer">
             ↕ 縦幅: 広め
           </button>
         </div>
 
-        <div class="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[11px] font-bold">
+        <div class="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold">
           <button id="view-mode-all" type="button"
             class="px-2 py-0.5 rounded-md bg-white text-blue-900 shadow-sm transition cursor-pointer">
             候補も表示
@@ -278,8 +278,8 @@
       </div>
 
       <!-- スクロール可能なタイムテーブル本体 -->
-      <div id="calendar-scroll-area" class="w-full h-[76dvh] lg:h-[78dvh] overflow-auto custom-scrollbar relative bg-white">
-        <div id="calendar-canvas-wrapper" class="relative"></div>
+      <div id="calendar-scroll-area" class="w-full h-[76dvh] lg:h-[78dvh] overflow-y-auto overflow-x-hidden custom-scrollbar relative bg-white">
+        <div id="calendar-canvas-wrapper" class="relative w-full"></div>
       </div>
     </section>
   </main>
@@ -575,7 +575,6 @@
         greeting: '💛'
       };
 
-      // デフォルトで「見る（ON）」に入れる演目キーワード
       const DEFAULT_WATCH_KEYWORDS = [
         'パレード',
         'クロミ・ライブ',
@@ -590,10 +589,8 @@
         return DEFAULT_WATCH_KEYWORDS.some((kw) => t.includes(kw));
       }
 
-      // 現行スケジュール基準の初期演目データ（指定6演目をデフォルト「見る（ON）」に設定）
       function createDefaultShows(dateStr) {
         const base = [
-          // === 見る（ON）初期6演目 ===
           {
             id: 'no-limit-parade',
             title: 'NO LIMIT! パレード ～Discover U!!! バージョン～',
@@ -660,8 +657,6 @@
             times: ['11:15', '13:00', '14:45', '16:30', '18:15', '20:00'],
             selectedTimes: []
           },
-
-          // === 見ない（OFF）初期演目 ===
           {
             id: 'wicked-oz',
             title: 'ウィキッド ～オズの魔女たち～',
@@ -1414,8 +1409,8 @@
         document.querySelectorAll('.cat-btn').forEach((btn) => {
           const isAct = btn.dataset.cat === state.activeCategory;
           btn.className = isAct
-            ? 'cat-btn px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-900 text-white shadow-sm transition cursor-pointer'
-            : 'cat-btn px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer';
+            ? 'cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-bold bg-blue-900 text-white shadow-sm transition cursor-pointer'
+            : 'cat-btn px-2 py-1 rounded-lg text-[11px] sm:text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition cursor-pointer';
         });
 
         const laneBtn = document.getElementById('btn-toggle-lanes');
@@ -1471,8 +1466,8 @@
 
         const card = document.createElement('div');
         card.className = isOn
-          ? 'bg-white rounded-xl p-2.5 border border-emerald-200/90 shadow-sm flex flex-col gap-1.5 transition hover:border-emerald-400'
-          : 'bg-white/90 rounded-xl p-2.5 border border-slate-200 shadow-sm flex flex-col gap-1.5 transition hover:border-slate-300';
+          ? 'bg-white rounded-xl p-2 sm:p-2.5 border border-emerald-200/90 shadow-sm flex flex-col gap-1.5 transition hover:border-emerald-400'
+          : 'bg-white/90 rounded-xl p-2 sm:p-2.5 border border-slate-200 shadow-sm flex flex-col gap-1.5 transition hover:border-slate-300';
 
         const topRow = document.createElement('div');
         topRow.className = 'flex items-center justify-between gap-1';
@@ -1642,32 +1637,32 @@
         const pxPerMin = ZOOM_PRESETS[state.zoomIndex].pxPerMin;
         const totalMinutes = calEndMin - calStartMin;
         const bodyHeight = Math.round(totalMinutes * pxPerMin);
-        const headerHeight = 34;
+        const headerHeight = 32;
 
         const stickyHeader = document.createElement('div');
-        stickyHeader.className = 'sticky top-0 z-20 flex bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 text-[11px] font-extrabold select-none';
+        stickyHeader.className = 'sticky top-0 z-20 flex bg-slate-50/95 backdrop-blur-sm border-b border-slate-200 text-[10px] sm:text-[11px] font-extrabold select-none';
         stickyHeader.style.height = `${headerHeight}px`;
 
         const timeHeader = document.createElement('div');
-        timeHeader.className = 'w-12 sm:w-14 shrink-0 flex items-center justify-center text-slate-500 border-r border-slate-200';
+        timeHeader.className = 'w-10 sm:w-14 shrink-0 flex items-center justify-center text-slate-500 border-r border-slate-200';
         timeHeader.textContent = '時間';
         stickyHeader.appendChild(timeHeader);
 
         if (state.twoLaneMode) {
           const onLaneHead = document.createElement('div');
-          onLaneHead.className = 'w-[60%] px-2.5 flex items-center gap-1 text-emerald-900 bg-emerald-50/90 border-r border-slate-200 truncate';
-          onLaneHead.textContent = '✅ 見る演目（タップで時間選択）';
+          onLaneHead.className = 'w-[60%] px-1.5 sm:px-2.5 flex items-center gap-1 text-emerald-900 bg-emerald-50/90 border-r border-slate-200 truncate';
+          onLaneHead.textContent = '✅ 見る演目';
 
           const offLaneHead = document.createElement('div');
-          offLaneHead.className = 'w-[40%] px-2.5 flex items-center gap-1 text-slate-600 bg-slate-100/90 truncate';
+          offLaneHead.className = 'w-[40%] px-1.5 sm:px-2.5 flex items-center gap-1 text-slate-600 bg-slate-100/90 truncate';
           offLaneHead.textContent = '🙈 見ない演目';
 
           stickyHeader.appendChild(onLaneHead);
           stickyHeader.appendChild(offLaneHead);
         } else {
           const singleHead = document.createElement('div');
-          singleHead.className = 'flex-1 px-3 flex items-center text-emerald-900 bg-emerald-50/90';
-          singleHead.textContent = '✅ 見る演目タイムテーブル（タップで時間決定／解除）';
+          singleHead.className = 'flex-1 px-2 sm:px-3 flex items-center text-emerald-900 bg-emerald-50/90 truncate';
+          singleHead.textContent = '✅ 見る演目タイムテーブル';
           stickyHeader.appendChild(singleHead);
         }
         wrapper.appendChild(stickyHeader);
@@ -1677,7 +1672,7 @@
         canvasRow.style.height = `${bodyHeight}px`;
 
         const timeAxis = document.createElement('div');
-        timeAxis.className = 'w-12 sm:w-14 shrink-0 relative border-r border-slate-200 bg-slate-50/50 select-none';
+        timeAxis.className = 'w-10 sm:w-14 shrink-0 relative border-r border-slate-200 bg-slate-50/50 select-none';
 
         const lanesArea = document.createElement('div');
         lanesArea.className = 'flex-1 min-w-0 relative flex';
@@ -1699,8 +1694,8 @@
           if (isHour || isHalf) {
             const label = document.createElement('div');
             label.className = isHour
-              ? 'absolute right-1.5 -translate-y-1/2 text-[10px] sm:text-[11px] font-extrabold text-slate-700'
-              : 'absolute right-1.5 -translate-y-1/2 text-[9px] font-semibold text-slate-400';
+              ? 'absolute right-1 sm:right-1.5 -translate-y-1/2 text-[9px] sm:text-[11px] font-extrabold text-slate-700'
+              : 'absolute right-1 sm:right-1.5 -translate-y-1/2 text-[8px] sm:text-[9px] font-semibold text-slate-400';
             label.style.top = `${topPx}px`;
             label.textContent = isHour ? minToTime(m) : ':30';
             timeAxis.appendChild(label);
@@ -1719,7 +1714,7 @@
             lanesArea.appendChild(guideLine);
 
             const tag = document.createElement('div');
-            tag.className = `absolute right-2 -translate-y-1/2 px-1.5 py-0.5 rounded border text-[9px] font-extrabold pointer-events-none z-10 ${marker.cls}`;
+            tag.className = `absolute right-1.5 -translate-y-1/2 px-1.5 py-0.5 rounded border text-[9px] font-extrabold pointer-events-none z-10 ${marker.cls}`;
             tag.style.top = `${topPx}px`;
             tag.textContent = marker.label;
             lanesArea.appendChild(tag);
@@ -1801,10 +1796,10 @@
           block.dataset.slotKey = key;
           block.style.top = `${topPx}px`;
           block.style.height = `${heightPx}px`;
-          block.style.left = `calc(${leftPct}% + 2px)`;
-          block.style.width = `calc(${widthPct}% - 4px)`;
+          block.style.left = `calc(${leftPct}% + 1.5px)`;
+          block.style.width = `calc(${widthPct}% - 3px)`;
 
-          let baseCls = 'absolute rounded-lg px-1.5 py-1 text-left overflow-hidden flex flex-col justify-between transition cursor-pointer select-none ';
+          let baseCls = 'absolute rounded-md px-1 sm:px-1.5 py-0.5 sm:py-1 text-left overflow-hidden flex flex-col justify-between transition cursor-pointer select-none ';
 
           if (isConflict) {
             baseCls += 'bg-red-600 border-2 border-red-900 text-white z-20 conflict-card';
@@ -1818,16 +1813,16 @@
           block.className = baseCls;
 
           const headerLine = document.createElement('div');
-          headerLine.className = 'flex items-center justify-between gap-1 leading-none';
+          headerLine.className = 'flex items-center justify-between gap-0.5 leading-none';
 
           const timeLabel = document.createElement('span');
-          timeLabel.className = 'text-[10px] font-extrabold tracking-tight truncate';
+          timeLabel.className = 'text-[9px] sm:text-[10px] font-extrabold tracking-tight truncate';
           timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)}` : time;
           headerLine.appendChild(timeLabel);
 
           if (isOnLane && _totalCols <= 3) {
             const rightBadges = document.createElement('div');
-            rightBadges.className = 'flex items-center gap-0.5 shrink-0';
+            rightBadges.className = 'hidden sm:flex items-center gap-0.5 shrink-0';
 
             if (showWatchCount > 0) {
               const watchPill = document.createElement('span');
@@ -1854,7 +1849,7 @@
           }
 
           const titleDiv = document.createElement('div');
-          titleDiv.className = 'text-[10px] sm:text-[11px] font-extrabold leading-tight line-clamp-2 mt-0.5';
+          titleDiv.className = 'text-[9px] sm:text-[11px] font-extrabold leading-tight line-clamp-2 mt-0.5';
           titleDiv.textContent = `${icon} ${show.title}`;
 
           block.appendChild(headerLine);
@@ -1863,8 +1858,8 @@
           if (heightPx >= 46) {
             const areaSpan = document.createElement('div');
             areaSpan.className = isSelected
-              ? 'text-[9px] opacity-90 truncate'
-              : 'text-[9px] text-slate-500 truncate';
+              ? 'text-[9px] opacity-90 truncate hidden sm:block'
+              : 'text-[9px] text-slate-500 truncate hidden sm:block';
             areaSpan.textContent = `📍 ${show.area}`;
             block.appendChild(areaSpan);
           }
@@ -2127,7 +2122,6 @@
         return parsedEntries;
       }
 
-      // 取り込みスケジュールで演目リストを完全書き換え（replaceUnlisted = true が既定）
       function applyImportedScheduleText(rawText, replaceAll = true) {
         const parsed = parseSchedulePasteText(rawText);
         if (parsed.length === 0) {
@@ -2324,7 +2318,6 @@
             showToast('⚠️ 演目名と時刻を読み取れませんでした。時刻表部分がコピーできているか確認してください。', 'warn');
             return;
           }
-          // 2件以下しか読み取れなかった場合はコピー途切れの可能性が高いため、うっかり全消去しないよう安全ガード
           const safeReplaceAll = replaceAll && parsedCount >= 3;
           if (replaceAll && !safeReplaceAll) {
             showToast('⚠️ 読み取れた演目が少ない（' + parsedCount + '件）ため、既存リストを残して反映しました');
