@@ -265,6 +265,10 @@
           </button>
         </div>
 
+        <div class="flex items-center gap-1 text-[10px] text-slate-500 font-semibold hidden xl:flex">
+          <span>💡 1タップ: 詳細 / 長押し: 見る⇔見ない切替</span>
+        </div>
+
         <div class="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold">
           <button id="view-mode-all" type="button"
             class="px-2 py-0.5 rounded-md bg-white text-blue-900 shadow-sm transition cursor-pointer">
@@ -283,6 +287,58 @@
       </div>
     </section>
   </main>
+
+  <!-- 演目詳細モーダル（1タップで表示・時間選択・ON/OFF・時間編集へ遷移） -->
+  <div id="detail-modal-overlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="px-5 py-3.5 bg-gradient-to-r from-indigo-950 to-blue-900 text-white flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div id="detail-category-badge" class="text-[10px] font-bold text-amber-300 tracking-wide">🎪 ショー</div>
+          <h3 id="detail-modal-title" class="text-sm sm:text-base font-extrabold truncate">演目詳細</h3>
+        </div>
+        <button id="detail-modal-close" type="button" class="text-sky-200 hover:text-white text-lg font-bold px-2 cursor-pointer shrink-0">✕</button>
+      </div>
+
+      <div class="p-4 sm:p-5 flex flex-col gap-4 max-h-[82dvh] overflow-y-auto">
+        <!-- メタ情報＆見る回数バッジ -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 rounded-xl p-3 border border-slate-200">
+          <div class="flex flex-col gap-0.5 text-xs text-slate-700 font-bold">
+            <div id="detail-area-text">📍 パーク内</div>
+            <div id="detail-duration-text" class="text-slate-500">⏱️ 所要時間：約25分</div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span id="detail-watch-count-badge" class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-950 border border-amber-300 text-xs font-extrabold">
+              0回見る
+            </span>
+            <span id="detail-status-pill" class="px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-900">
+              見る（ON）
+            </span>
+          </div>
+        </div>
+
+        <!-- 公演回ごとの選択切替 -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-extrabold text-slate-700">🕒 公演スケジュール（タップで鑑賞決定／解除）</span>
+            <span class="text-[10px] text-slate-400">複数回選択もOK</span>
+          </div>
+          <div id="detail-time-slots" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- アクションボタン群 -->
+        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+          <button id="detail-btn-toggle-watch" type="button"
+            class="py-2.5 px-3 rounded-xl text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1">
+            見ないに移動
+          </button>
+          <button id="detail-btn-open-edit" type="button"
+            class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1">
+            ✏️ 時間・情報を編集
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- 演目追加・公演時間編集モーダル -->
   <div id="modal-overlay" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
@@ -1024,6 +1080,7 @@
         viewMode: savedPrefs.viewMode === 'selected' ? 'selected' : 'all',
         mobileTab: 'calendar',
         modalTempTimes: [],
+        detailShowId: null,
         resetConfirmTimer: null
       };
 
@@ -1212,22 +1269,163 @@
               : `「${target.title}」${timeStr} を鑑賞予定に決定しました`
           );
         }
+        if (state.detailShowId === showId) {
+          renderDetailModalContent();
+        }
       }
 
-      function setBulkEnabled(enableFlag) {
-        let changed = 0;
-        state.shows.forEach((s) => {
-          if (state.activeCategory === 'all' || s.category === state.activeCategory) {
-            if (s.enabled !== enableFlag) {
-              s.enabled = enableFlag;
-              changed++;
+      function attachLongPressAndTap(el, options) {
+        const longPressMs = options.longPressMs || 520;
+        let pressTimer = null;
+        let longPressTriggered = false;
+        let startX = 0;
+        let startY = 0;
+
+        function clearPressTimer() {
+          if (pressTimer) {
+            clearTimeout(pressTimer);
+            pressTimer = null;
+          }
+        }
+
+        function onStart(clientX, clientY) {
+          longPressTriggered = false;
+          startX = clientX;
+          startY = clientY;
+          clearPressTimer();
+          pressTimer = setTimeout(() => {
+            longPressTriggered = true;
+            if (typeof options.onLongPress === 'function') {
+              options.onLongPress();
             }
+          }, longPressMs);
+        }
+
+        function onMove(clientX, clientY) {
+          if (!pressTimer) return;
+          if (Math.abs(clientX - startX) > 10 || Math.abs(clientY - startY) > 10) {
+            clearPressTimer();
+          }
+        }
+
+        function onCancel() {
+          clearPressTimer();
+        }
+
+        el.addEventListener('pointerdown', (e) => {
+          if (e.button !== undefined && e.button !== 0 && e.pointerType === 'mouse') return;
+          onStart(e.clientX, e.clientY);
+        });
+        el.addEventListener('pointermove', (e) => {
+          onMove(e.clientX, e.clientY);
+        });
+        el.addEventListener('pointerup', onCancel);
+        el.addEventListener('pointercancel', onCancel);
+        el.addEventListener('pointerleave', onCancel);
+
+        el.addEventListener('contextmenu', (e) => {
+          if (typeof options.onLongPress === 'function') {
+            e.preventDefault();
+            longPressTriggered = true;
+            options.onLongPress();
           }
         });
-        if (changed > 0) {
-          commitUserChange(enableFlag ? `${changed}件の演目をすべてONにしました` : `${changed}件の演目をすべてOFFにしました`);
+
+        el.addEventListener('click', (e) => {
+          if (longPressTriggered) {
+            e.preventDefault();
+            e.stopPropagation();
+            longPressTriggered = false;
+            return;
+          }
+          if (typeof options.onTap === 'function') {
+            options.onTap(e);
+          }
+        });
+      }
+
+      function openDetailModal(showId) {
+        const target = state.shows.find((s) => s.id === showId);
+        if (!target) return;
+        state.detailShowId = showId;
+        renderDetailModalContent();
+        const overlay = document.getElementById('detail-modal-overlay');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+      }
+
+      function closeDetailModal() {
+        state.detailShowId = null;
+        const overlay = document.getElementById('detail-modal-overlay');
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+      }
+
+      function renderDetailModalContent() {
+        const show = state.shows.find((s) => s.id === state.detailShowId);
+        if (!show) return;
+
+        const icon = CATEGORY_ICONS[show.category] || '🎪';
+        const catLabel = show.category === 'parade' ? 'パレード' : show.category === 'greeting' ? 'グリーティング' : 'ショー';
+        const watchCount = show.enabled ? show.selectedTimes.length : 0;
+        const theme = COLOR_THEMES[show.color] || COLOR_THEMES.blue;
+
+        document.getElementById('detail-category-badge').textContent = `${icon} ${catLabel}`;
+        document.getElementById('detail-modal-title').textContent = show.title;
+        document.getElementById('detail-area-text').textContent = `📍 ${show.area}`;
+        document.getElementById('detail-duration-text').textContent = `⏱️ 所要時間：約${show.duration}分`;
+
+        const watchBadge = document.getElementById('detail-watch-count-badge');
+        watchBadge.textContent = `${watchCount}回見る`;
+
+        const statusPill = document.getElementById('detail-status-pill');
+        if (show.enabled) {
+          statusPill.textContent = '見る（ON）';
+          statusPill.className = 'px-2.5 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-900';
         } else {
-          showToast('変更対象の演目はありません');
+          statusPill.textContent = '見ない（OFF）';
+          statusPill.className = 'px-2.5 py-1 rounded-full text-xs font-extrabold bg-slate-200 text-slate-700';
+        }
+
+        const slotsWrap = document.getElementById('detail-time-slots');
+        slotsWrap.innerHTML = '';
+        if (!show.times || show.times.length === 0) {
+          slotsWrap.innerHTML = '<span class="text-xs text-slate-400">公演時刻が登録されていません</span>';
+        } else {
+          const { selectedItems, conflictKeys } = getSelectedSlotsWithConflicts();
+          show.times.forEach((t, idx) => {
+            const isSelected = show.enabled && show.selectedTimes.includes(t);
+            const isConflict = isSelected && conflictKeys.has(show.id + '@' + t);
+            const st = timeToMin(t);
+            const ed = st + show.duration;
+            const candOverlap = !isSelected && doesCandidateOverlapSelected(show.id, st, ed, selectedItems);
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            let cls = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer flex items-center gap-1 ';
+            if (isConflict) {
+              cls += 'bg-red-600 text-white border-red-800';
+            } else if (isSelected) {
+              cls += theme.chipSelected;
+            } else if (candOverlap) {
+              cls += 'bg-slate-100 text-slate-400 border-slate-200 line-through';
+            } else {
+              cls += theme.chipIdle;
+            }
+            btn.className = cls;
+            btn.textContent = `${idx + 1}回目 ${t}～${minToTime(ed)}${isSelected ? ' ✓' : ''}`;
+            btn.addEventListener('click', () => toggleTimeSlot(show.id, t));
+            slotsWrap.appendChild(btn);
+          });
+        }
+
+        const toggleWatchBtn = document.getElementById('detail-btn-toggle-watch');
+        if (show.enabled) {
+          toggleWatchBtn.className = 'py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1';
+          toggleWatchBtn.textContent = '🙈 見ないに移動';
+        } else {
+          toggleWatchBtn.className = 'py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold transition cursor-pointer flex items-center justify-center gap-1';
+          toggleWatchBtn.textContent = '✅ 見るに移動';
         }
       }
 
@@ -1503,8 +1701,12 @@
         titleRow.className = 'flex items-start justify-between gap-1';
 
         const titleH4 = document.createElement('h4');
-        titleH4.className = 'text-xs font-extrabold text-slate-900 leading-snug';
+        titleH4.className = 'text-xs font-extrabold text-slate-900 leading-snug hover:text-blue-800 cursor-pointer';
         titleH4.textContent = `${icon} ${show.title}`;
+        attachLongPressAndTap(titleH4, {
+          onTap: () => openDetailModal(show.id),
+          onLongPress: () => toggleShowEnabled(show.id)
+        });
 
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
@@ -1650,11 +1852,11 @@
 
         if (state.twoLaneMode) {
           const onLaneHead = document.createElement('div');
-          onLaneHead.className = 'w-[60%] px-1.5 sm:px-2.5 flex items-center gap-1 text-emerald-900 bg-emerald-50/90 border-r border-slate-200 truncate';
+          onLaneHead.className = 'w-[58%] px-1.5 sm:px-2.5 flex items-center gap-1 text-emerald-900 bg-emerald-50/90 border-r border-slate-200 truncate';
           onLaneHead.textContent = '✅ 見る演目';
 
           const offLaneHead = document.createElement('div');
-          offLaneHead.className = 'w-[40%] px-1.5 sm:px-2.5 flex items-center gap-1 text-slate-600 bg-slate-100/90 truncate';
+          offLaneHead.className = 'w-[42%] px-1.5 sm:px-2.5 flex items-center gap-1 text-slate-700 bg-slate-100/95 truncate';
           offLaneHead.textContent = '🙈 見ない演目';
 
           stickyHeader.appendChild(onLaneHead);
@@ -1755,10 +1957,10 @@
 
         if (state.twoLaneMode) {
           const onLane = document.createElement('div');
-          onLane.className = 'w-[60%] relative border-r border-slate-200';
+          onLane.className = 'w-[58%] relative border-r border-slate-200';
 
           const offLane = document.createElement('div');
-          offLane.className = 'w-[40%] relative bg-slate-50/45';
+          offLane.className = 'w-[42%] relative bg-slate-50/75';
 
           renderLaneBlocks(onLane, computeColumnLayout(onEvents), true, pxPerMin, calStartMin, selectedItems, conflictKeys);
           renderLaneBlocks(offLane, computeColumnLayout(offEvents), false, pxPerMin, calStartMin, selectedItems, conflictKeys);
@@ -1787,7 +1989,7 @@
           const showWatchCount = show.enabled ? show.selectedTimes.length : 0;
 
           const topPx = Math.max(0, (startMin - calStartMin) * pxPerMin) + 1;
-          const heightPx = Math.max(26, (endMin - startMin) * pxPerMin - 2);
+          const heightPx = Math.max(isOnLane ? 30 : 34, (endMin - startMin) * pxPerMin - 2);
           const widthPct = 100 / _totalCols;
           const leftPct = _col * widthPct;
 
@@ -1808,7 +2010,7 @@
           } else if (isOnLane) {
             baseCls += `border border-dashed ${theme.calCandidate} ${candOverlap ? 'opacity-50' : ''}`;
           } else {
-            baseCls += `border border-dashed ${theme.calOff} opacity-90 hover:opacity-100`;
+            baseCls += `border border-slate-300/95 bg-white/95 text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.06)] hover:bg-slate-50`;
           }
           block.className = baseCls;
 
@@ -1816,46 +2018,52 @@
           headerLine.className = 'flex items-center justify-between gap-0.5 leading-none';
 
           const timeLabel = document.createElement('span');
-          timeLabel.className = 'text-[9px] sm:text-[10px] font-extrabold tracking-tight truncate';
+          timeLabel.className = isOnLane
+            ? 'text-[9px] sm:text-[10px] font-extrabold tracking-tight truncate'
+            : 'text-[10px] sm:text-[11px] font-extrabold tracking-tight text-slate-800 truncate';
           timeLabel.textContent = isOnLane ? `${time}-${minToTime(endMin)}` : time;
           headerLine.appendChild(timeLabel);
 
-          if (isOnLane && _totalCols <= 3) {
+          if (isOnLane) {
             const rightBadges = document.createElement('div');
-            rightBadges.className = 'hidden sm:flex items-center gap-0.5 shrink-0';
+            rightBadges.className = 'flex items-center gap-0.5 shrink-0';
 
             if (showWatchCount > 0) {
               const watchPill = document.createElement('span');
               watchPill.className = isSelected || isConflict
-                ? 'px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold'
-                : 'px-1 py-0.5 rounded bg-amber-200/90 text-amber-950 text-[9px] font-extrabold';
+                ? 'px-1 py-0.5 rounded bg-black/25 text-[8px] sm:text-[9px] font-extrabold leading-none'
+                : 'px-1 py-0.5 rounded bg-amber-300 text-slate-950 text-[8px] sm:text-[9px] font-extrabold leading-none';
               watchPill.textContent = `${showWatchCount}回見る`;
               rightBadges.appendChild(watchPill);
             }
 
-            const statusBadge = document.createElement('span');
-            if (isConflict) {
-              statusBadge.className = 'px-1 py-0.5 rounded bg-white text-red-700 text-[9px] font-extrabold';
-              statusBadge.textContent = '重複';
-            } else if (isSelected) {
-              statusBadge.className = 'px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold';
-              statusBadge.textContent = '✓決定';
-            } else {
-              statusBadge.className = 'px-1 py-0.5 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold';
-              statusBadge.textContent = candOverlap ? '被り' : '候補';
+            if (_totalCols <= 3) {
+              const statusBadge = document.createElement('span');
+              if (isConflict) {
+                statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-white text-red-700 text-[9px] font-extrabold leading-none';
+                statusBadge.textContent = '重複';
+              } else if (isSelected) {
+                statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold leading-none';
+                statusBadge.textContent = '✓決定';
+              } else {
+                statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-slate-900/10 text-slate-700 text-[9px] font-bold leading-none';
+                statusBadge.textContent = candOverlap ? '被り' : '候補';
+              }
+              rightBadges.appendChild(statusBadge);
             }
-            rightBadges.appendChild(statusBadge);
             headerLine.appendChild(rightBadges);
           }
 
           const titleDiv = document.createElement('div');
-          titleDiv.className = 'text-[9px] sm:text-[11px] font-extrabold leading-tight line-clamp-2 mt-0.5';
-          titleDiv.textContent = `${icon} ${show.title}`;
+          titleDiv.className = isOnLane
+            ? 'text-[9px] sm:text-[11px] font-extrabold leading-tight line-clamp-2 mt-0.5'
+            : 'text-[10px] sm:text-[11px] font-bold leading-[1.2] text-slate-900 line-clamp-2 mt-0.5 break-all';
+          titleDiv.textContent = isOnLane ? `${icon} ${show.title}` : show.title;
 
           block.appendChild(headerLine);
           block.appendChild(titleDiv);
 
-          if (heightPx >= 46) {
+          if (heightPx >= 46 && isOnLane) {
             const areaSpan = document.createElement('div');
             areaSpan.className = isSelected
               ? 'text-[9px] opacity-90 truncate hidden sm:block'
@@ -1864,7 +2072,10 @@
             block.appendChild(areaSpan);
           }
 
-          block.addEventListener('click', () => toggleTimeSlot(show.id, time));
+          attachLongPressAndTap(block, {
+            onTap: () => openDetailModal(show.id),
+            onLongPress: () => toggleShowEnabled(show.id)
+          });
           container.appendChild(block);
         });
       }
@@ -2422,14 +2633,19 @@
           if (e.target.id === 'modal-overlay') closeEditModal();
         });
 
-        document.getElementById('btn-add-time-chip').addEventListener('click', () => {
-          const val = document.getElementById('input-new-time').value;
-          if (!val) return;
-          if (!state.modalTempTimes.includes(val)) {
-            state.modalTempTimes.push(val);
-            state.modalTempTimes.sort();
-            renderModalTimeChips();
-          }
+        document.getElementById('detail-modal-close').addEventListener('click', closeDetailModal);
+        document.getElementById('detail-modal-overlay').addEventListener('click', (e) => {
+          if (e.target.id === 'detail-modal-overlay') closeDetailModal();
+        });
+        document.getElementById('detail-btn-toggle-watch').addEventListener('click', () => {
+          if (!state.detailShowId) return;
+          toggleShowEnabled(state.detailShowId);
+          renderDetailModalContent();
+        });
+        document.getElementById('detail-btn-open-edit').addEventListener('click', () => {
+          const id = state.detailShowId;
+          closeDetailModal();
+          if (id) openEditModal(id);
         });
 
         document.getElementById('show-form').addEventListener('submit', (e) => {
