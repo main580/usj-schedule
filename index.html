@@ -51,10 +51,10 @@
     /* 時間重複時のパルスアニメーション */
     @keyframes conflictPulse {
       0%, 100% {
-        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9), 0 4px 12px rgba(239, 68, 68, 0.28);
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.95), 0 4px 12px rgba(239, 68, 68, 0.25);
       }
       50% {
-        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4), 0 4px 16px rgba(239, 68, 68, 0.45);
+        box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.45), 0 4px 16px rgba(239, 68, 68, 0.4);
       }
     }
     .conflict-card {
@@ -266,7 +266,7 @@
         </div>
 
         <div class="flex items-center gap-1 text-[10px] text-slate-500 font-semibold hidden xl:flex">
-          <span>💡 1タップ: 詳細 / 長押し: 見る⇔見ない切替</span>
+          <span>💡 見る: タップで決定/解除・長押しで詳細 / 見ない: 長押しで詳細</span>
         </div>
 
         <div class="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold">
@@ -1404,7 +1404,7 @@
             btn.type = 'button';
             let cls = 'px-2.5 py-1.5 rounded-xl text-xs font-extrabold border transition cursor-pointer flex items-center gap-1 ';
             if (isConflict) {
-              cls += 'bg-red-600 text-white border-red-800';
+              cls += `${theme.chipSelected} !border-2 !border-red-600 ring-2 ring-red-400`;
             } else if (isSelected) {
               cls += theme.chipSelected;
             } else if (candOverlap) {
@@ -1745,7 +1745,7 @@
 
             let cls = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-extrabold border transition cursor-pointer ';
             if (isConflict) {
-              cls += 'bg-red-600 text-white border-red-800 ring-2 ring-red-300';
+              cls += `${theme.chipSelected} !border-2 !border-red-600 ring-2 ring-red-400`;
             } else if (isSelected) {
               cls += theme.chipSelected;
             } else if (!isOn) {
@@ -2004,7 +2004,7 @@
           let baseCls = 'absolute rounded-md px-1 sm:px-1.5 py-0.5 sm:py-1 text-left overflow-hidden flex flex-col justify-between transition cursor-pointer select-none ';
 
           if (isConflict) {
-            baseCls += 'bg-red-600 border-2 border-red-900 text-white z-20 conflict-card';
+            baseCls += `border-2 border-red-600 z-20 conflict-card ${theme.calSelected}`;
           } else if (isSelected) {
             baseCls += `border-2 z-10 ${theme.calSelected}`;
           } else if (isOnLane) {
@@ -2030,7 +2030,7 @@
 
             if (showWatchCount > 0) {
               const watchPill = document.createElement('span');
-              watchPill.className = isSelected || isConflict
+              watchPill.className = isSelected
                 ? 'px-1 py-0.5 rounded bg-black/25 text-[8px] sm:text-[9px] font-extrabold leading-none'
                 : 'px-1 py-0.5 rounded bg-amber-300 text-slate-950 text-[8px] sm:text-[9px] font-extrabold leading-none';
               watchPill.textContent = `${showWatchCount}回見る`;
@@ -2040,7 +2040,7 @@
             if (_totalCols <= 3) {
               const statusBadge = document.createElement('span');
               if (isConflict) {
-                statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-white text-red-700 text-[9px] font-extrabold leading-none';
+                statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-red-600 text-white text-[9px] font-extrabold leading-none';
                 statusBadge.textContent = '重複';
               } else if (isSelected) {
                 statusBadge.className = 'hidden sm:inline-block px-1 py-0.5 rounded bg-black/20 text-[9px] font-extrabold leading-none';
@@ -2073,8 +2073,8 @@
           }
 
           attachLongPressAndTap(block, {
-            onTap: () => openDetailModal(show.id),
-            onLongPress: () => toggleShowEnabled(show.id)
+            onTap: isOnLane ? () => toggleTimeSlot(show.id, time) : undefined,
+            onLongPress: isOnLane ? () => openDetailModal(show.id) : () => openDetailModal(show.id)
           });
           container.appendChild(block);
         });
